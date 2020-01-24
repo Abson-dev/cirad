@@ -38,7 +38,7 @@ myExpl = stack( system.file( "external/bioclim/current/bio3.grd",
 
 
 #functions
-gen_menusInputData <-
+genObserver_menus <-
   function(pat="btn_results_", n=1, updateVal) {
     res <- paste0('observeEvent(input$',pat,n,', {
                   curid <- "',pat,n,'"
@@ -270,7 +270,7 @@ cirad_hema <-function()
       })
       
       # required observers that update the color of the active button!
-      eval(parse(text=gen_menusInputData(pat="btn_import_data_", n=1:8, updateVal="cur_selection_import")))
+      eval(parse(text=genObserver_menus(pat="btn_import_data_", n=1:8, updateVal="cur_selection_import")))
       return(uiOutput("ui_sel_resbtns_import"))
     })
     output$ui_import_data <- renderUI({
