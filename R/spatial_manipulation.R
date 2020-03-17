@@ -29,17 +29,24 @@ setwd("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\")
 l1<-list.files("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 worlClim<-stack(l1)
-worlClim2<-raster("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\wc2.0_bio_30s_01.tif")
+worlClim_bio1<-raster("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\wc2.0_bio_30s_01.tif")
 names(worlClim)
 plot(worlClim)
 plot(worlClim$wc2.0_bio_30s_17)
 #############################################
+# crop ou mask
+#shp des variables sur les espèces Species_shape
+#.tif des variables bioclimatiques, worlClim
+Base_mask<-mask(worlClim,Species_shape)
 
 #######################################
+
+
+
 filename_zone<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4","\\Diohine_Echanti_Classif.shp")
 filename_zone
 zone_etude<-shapefile(filename_zone)
-zone_raster<-raster("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\Diohine_Echanti_Classif.shp")
+
 library(sf)
 library("ggspatial")
 install.packages("tmap")
