@@ -1,10 +1,10 @@
 #
 install.packages("raster")
 library(raster)
-filename<-paste0("E:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK.shp")
+filename<-paste0("E:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 filename
 Species_shape<-shapefile(filename)
-Species_raster<-raster("E:\\Stage_SDM\\SDM\\Data\\BD_Arbre\\arbres_diohine_mai2018_par_Zone_OK.shp")
+#Species_raster<-raster("E:\\Stage_SDM\\SDM\\Data\\BD_Arbre\\arbres_diohine_mai2018_par_Zone_OK.shp")
 install.packages("spdep")
 library(spdep)
 #wr<-poly2nb(Species_shape,row.names = Species_shape$ID_GPS,queen = F)
@@ -29,7 +29,7 @@ setwd("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\")
 l1<-list.files("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 worlClim<-stack(l1)
-worlClim_bio1<-raster("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\wc2.0_bio_30s_01.tif")
+#worlClim_bio1<-raster("E:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\wc2.0_bio_30s_01.tif")
 names(worlClim)
 plot(worlClim)
 plot(worlClim$wc2.0_bio_30s_17)
@@ -37,9 +37,14 @@ plot(worlClim$wc2.0_bio_30s_17)
 # crop ou mask
 #shp des variables sur les espèces Species_shape
 #.tif des variables bioclimatiques, worlClim
-Base_mask<-mask(worlClim,Species_shape)
-
+ext<-extent(Species_shape)
+worldClim.crop<-crop(worlClim,ext)
+#plot(worldClim.crop$wc2.0_bio_30s_01)
+BASE.Model<-extract()
 #######################################
+
+
+
 
 
 
@@ -51,6 +56,7 @@ library(sf)
 library("ggspatial")
 install.packages("tmap")
 library(tmap)
+library(ggplot2)
 map<-st_as_sf(zone_etude)
 strat_zone<-ggplot(map)  + geom_sf(aes(fill=Zone),colour="green") + 
   theme_gray() + annotation_scale(location = "bl", width_hint = 0.3) +
