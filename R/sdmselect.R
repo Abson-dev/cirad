@@ -39,6 +39,7 @@ class(data_df)
 # plot(zone_etude, add=TRUE)
 # points(Faidherbia_1,col='blue')
 #######################################
+##########???les espèces dans les différentes zones
 Base_Espece_Zone1<-data_sf %>%
   filter(Zone == 1)
 Base_Espece_Zone2<-data_sf %>%
