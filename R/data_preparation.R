@@ -15,7 +15,7 @@ library(dismo)
 # plot(worlClim)
 install.packages("raster")
 library(raster)
-filename<-paste0("D:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK.shp")
+filename<-paste0("D:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 filename
  Species_shape<-shapefile(filename)
  class(Species)
