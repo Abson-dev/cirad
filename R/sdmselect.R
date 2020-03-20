@@ -89,3 +89,89 @@ sp::plot(data.new,
          col = c("red", "blue")[data.new@data$dataY + 1],
          pch = 20, cex = c(0.5, 1)[data@data$Faidherbia + 1],
          add = TRUE)
+#covariables corrélations
+corSpearman <- Param_corr(
+  x = data.new, rm = 1, thd = 0.7, visual = FALSE,
+  plot = TRUE, img.size = 20, saveWD = tmpdir)
+
+#Find the best combination of covariables
+modelselect_opt(RESET = TRUE)
+modelselect_opt$Max_nb_Var <- 3
+modelselect_opt$datatype <- "PA"
+
+res.file <- findBestModel(x = data.new, datatype = "PA", 
+                          corSpearman = corSpearman, 
+                          saveWD = tmpdir, 
+                          verbose = 1)
+#Order models according to quality of prediction
+# Order models and find the bests
+BestModels <- ModelOrder(saveWD = tmpdir, plot = TRUE)
+#Predictions of the best model
+Num.Best <- BestModels$VeryBestModels_crossV$Num[1]
+res.file <- ModelResults(saveWD = tmpdir, plot = TRUE, 
+                         Num = Num.Best)
+#Species distribution mapping
+#Probability of presence
+pred.r <- Map_predict(object = covariates, saveWD = tmpdir, Num = Num.Best)
+
+predr <- system.file("SDM_Selection", "predr.tif", package = "SDMSelect")
+pred.r <- raster::stack(predr)
+predrNames <- system.file("SDM_Selection", "predrNames.rds", package = "SDMSelect")
+names(pred.r) <- readr::read_rds(predrNames)
+# Get partial raster data to plot in ggplot
+pred.r.gg <- gplot_data(pred.r)
+# Plot
+ggplot() +
+  geom_tile(
+    data = dplyr::filter(pred.r.gg, variable == "resp.fit"), 
+    aes(x = x, y = y, fill = value)) +
+  scale_fill_gradient("Probability", low = 'yellow', high = 'blue') +
+  coord_equal()
+#Uncertainties
+rasterVis::gplot(raster::dropLayer(pred.r, which(!names(pred.r) %in% c("Q5", "Q95")))) +
+  geom_tile(aes(fill = value)) +
+  facet_grid(~variable) +
+  scale_fill_gradient("Probability", low = 'yellow', high = 'blue') +
+  coord_equal()
+
+rasterVis::gplot(raster::dropLayer(pred.r, which(!names(pred.r) %in% c("IQR")))) +
+  geom_tile(aes(fill = value)) +
+  facet_grid(~variable) +
+  scale_fill_gradient("Absolute\nDispersion", low = 'white', high = 'red') +
+  coord_equal()
+
+rasterVis::gplot(raster::dropLayer(pred.r, which(!names(pred.r) %in% c("IQR.M")))) +
+  geom_tile(aes(fill = value)) +
+  facet_grid(~variable) +
+  scale_fill_gradient("Relative\nDispersion\nto median", low = 'white', high = 'red') +
+  coord_equal()
+#Separating presence from absences
+model_selected <- model_select(
+  saveWD = tmpdir,
+  new.data = data.new,
+  Num = Num.Best)
+BestThd <- model_selected$Seuil
+
+BestThdFile <- system.file("SDM_Selection", "BestThd.rds", package = "SDMSelect")
+BestThd <- readr::read_rds(BestThdFile)
+
+rasterVis::gplot(raster::raster(pred.r, "resp.fit")) +
+  geom_tile(aes(fill = value)) +
+  scale_fill_gradient2("Probability\nof\nPresence",
+                       low = 'white', mid = 'yellow',  high = 'blue',
+                       midpoint = BestThd) +
+  coord_equal()
+
+rasterVis::gplot(raster::raster(pred.r, "ProbaSup")) +
+  geom_tile(aes(fill = value)) +
+  scale_fill_gradient2("Probability\nto be over\nThreshold", 
+                       low = 'white', mid = 'yellow', high = 'forestgreen',
+                       midpoint = 50) +
+  coord_equal()
+
+#Mask
+rasterVis::gplot(raster::dropLayer(pred.r, which(!grepl("mask", names(pred.r))))) +
+  geom_tile(aes(fill = factor(value))) +
+  facet_grid(~variable) +
+  scale_fill_manual("mask", values = c("0" = "red", "1" = "forestgreen")) +
+  coord_equal()
