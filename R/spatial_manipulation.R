@@ -44,14 +44,17 @@ BASE.Model<-extract()
 
 #SDMselect
 
-devtools::install_github("statnmap/SDMSelect")
+install.packages("remotes")
+library(remotes)
+remotes::install_github("statnmap/SDMSelect")
+
 library(SDMSelect)
 filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 filename
 Species_shape<-shapefile(filename)
-l1<-list.files("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\wc2.0_30s_bio\\",patt="\\.tif")
-l1<-sprintf("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\wc2.0_30s_bio\\%s",l1)
-worlClim<-stack(l1)
+#l1<-list.files("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\wc2.0_30s_bio\\",patt="\\.tif")
+#l1<-sprintf("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\wc2.0_30s_bio\\%s",l1)
+#worlClim<-stack(l1)
 #######################################
 
 
