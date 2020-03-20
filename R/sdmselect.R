@@ -46,7 +46,7 @@ Base_Espece_Zone2<-data_sf %>%
   filter(Zone == 2)
 Base_Espece_Zone4<-data_sf %>%
   filter(Zone == 3)
-Base_Espece_Zone1<-data_sf %>%
+Base_Espece_Zone4<-data_sf %>%
   filter(Zone == 4)
 ###################Modélisation dans la zone 1, avec les variables de worldClim
 ########Faidherbia albida
@@ -57,3 +57,35 @@ names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
 sp::coordinates(Base_Faidherbia_Z1) <-~lon+lat
 sp::proj4string(Base_Faidherbia_Z1) <-"+proj=longlat +datum=WGS84"
 #extract covariables, combine with dataset 
+data<-CovarExtract(x=Base_Faidherbia_Z1,cov.paths = l1)
+names(data)
+#show observations positions
+par(mar=c(1,1,1,1))
+raster::plot(worldClim.crop,"wc2.0_bio_30s_01")
+sp::plot(zone_etude, add=T)
+sp::plot(data,col=c("red","blue")[data@data$Faidherbia + 1],pch=20, cex=c(0.5,1)[data@data$Faidherbia + 1],add=T)
+#prepare the spatial dataset for modelling
+data.prepared<-Prepare_dataset(x=data,var=1,cov = 2:ncol(data),datatype = "PA",na.rm = TRUE)
+tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions"
+thd <- spatialcor_dist(
+  x = data.prepared, longlat = !is.projected(data),
+  binomial = TRUE, saveWD = tmpdir,
+  plot = TRUE,
+  figname = "Correlogram"
+)
+# Create a regular grid from dataset
+RefRaster <- RefRasterize(x = data, res = round(thd[2]))
+# Use rectangular grid to resample dataset
+data.new <- Prepare_dataset(
+  x = data.prepared, var = 1, cov = 2:ncol(data),
+  RefRaster = RefRaster, datatype = "PA", na.rm = TRUE
+)
+
+# Plot data.new
+par(mar = c(1,1,1,1))
+raster::plot(worldClim.crop, "wc2.0_bio_30s_01")
+sp::plot(zone_etude, add = TRUE)
+sp::plot(data.new, 
+         col = c("red", "blue")[data.new@data$dataY + 1],
+         pch = 20, cex = c(0.5, 1)[data@data$Faidherbia + 1],
+         add = TRUE)
