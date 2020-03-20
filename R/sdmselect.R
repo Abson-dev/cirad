@@ -35,4 +35,6 @@ data_Faidherbia_1<-data_Faidherbia %>%
 Faidherbia_1<-data_Faidherbia_1 %>%
   select(xcoord,ycoord)
 plot(worldClim.crop,1)
+plot(zone_etude, add=TRUE)
 points(Faidherbia_1,col='blue')
+
