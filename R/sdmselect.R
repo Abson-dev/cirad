@@ -54,3 +54,6 @@ Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
   select(xcoord,ycoord,Faidherbia_albida)
 names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
 #Transform data as SpatialPointDataFrame
+sp::coordinates(Base_Faidherbia_Z1) <-~lon+lat
+sp::proj4string(Base_Faidherbia_Z1) <-"+proj=longlat +datum=WGS84"
+#extract covariables, combine with dataset 
