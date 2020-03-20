@@ -65,7 +65,7 @@ Species_shape<-shapefile(filename)
 filename_zone<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4","\\Diohine_Echanti_Classif.shp")
 filename_zone
 zone_etude<-shapefile(filename_zone)
-
+plot(zone_etude)
 library(sf)
 library("ggspatial")
 install.packages("tmap")
