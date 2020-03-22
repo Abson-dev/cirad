@@ -1,31 +1,29 @@
+######### ici je fais uniquement la modélisation de Faidherbia albida
 library(SDMSelect)
 library(dplyr)
-Base_Espece<-Species
+Base_Espece<-Species #Species<-st_read(filename,quiet = T), voir le fichier data_preparation
+#ou faire
+#1) filename<-paste0("D:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+#2)library(sf)
+#3) Species<-st_read(filename,quiet = T)
 Base_Espece$Faidherbia_albida<-if_else(Base_Espece$Species =="Faidherbia albida","1","0")
 Base_Espece$Faidherbia_albida<-as.factor(Base_Espece$Faidherbia_albida)
-#Balanites aegyptiaca
-Base_Espece$Balanites_aegyptiaca<-as.factor(if_else(Base_Espece$Species =="Balanites aegyptiaca","1","0"))
-
-#Anogeissus leiocarpus
-Base_Espece$Anogeissus_leiocarpus<-as.factor(if_else(Base_Espece$Species =="Anogeissus leiocarpus","1","0"))
-#Adansonia digitata
-Base_Espece$Adansonia_digitata<-as.factor(if_else(Base_Espece$Species =="Adansonia digitata","1","0"))
-#Acacia nilotica
-Base_Espece$Acacia_nilotica<-as.factor(if_else(Base_Espece$Species =="Acacia nilotica","1","0"))
-##############
+#################################################
+########???importation des données de worldclim
+###1)prendre les fichiers .tif(raster) qui se trouvent dans le dossier indiquer
 l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+###2) utiliser la fonction stack pour rendre RasterStack
 worlClim<-stack(l1)
-covar<-names(worlClim)
+###3)connaitre l'étendue de notre zone d'étude (ext)
 ext<-extent(Species)
+###4)utiliser crop pour mettre a la même zone d'étude les données de worlclim
 worldClim.crop<-crop(worlClim,ext)
 plot(worldClim.crop$bio1)
-
-#data<-CovarExtract(x=Base_Espece,cov.paths = l1)
 library(sf)
+#####supprimer la géométrie afin de pouvoir faire quelques manipulations
 data_df<-st_drop_geometry(Base_Espece)
 class(data_df)
-
 ##########???les espèces dans les différentes zones
 Base_Espece_Zone1<-data_df %>%
   filter(Zone == 1)
@@ -36,15 +34,15 @@ Base_Espece_Zone4<-data_df %>%
 Base_Espece_Zone4<-data_df %>%
   filter(Zone == 4)
 ###################Modélisation dans la zone 1, avec les variables de worldClim
-#extract covariables, combine with dataset 
-#Transform data as SpatialPointDataFrame
 class(Base_Faidherbia_Z1)
 FZ1<-Base_Faidherbia_Z1
 view(FZ1)
+#Transform data as SpatialPointDataFrame
 sp::coordinates(FZ1) <-~lon+lat
 sp::proj4string(FZ1) <-"+proj=longlat +datum=WGS84"
+#extract covariables, combine with dataset 
 dataFZ1<-CovarExtract(x=FZ1,cov.paths = l1) # en utilsisant SDMSelect
-
+############## 
 library(maptools)
 library(rgdal) 
 tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions"
@@ -70,8 +68,10 @@ map1$Faidherbia<-as.factor(map1$Faidherbia)
 #   geom_raster(data= rasterFZ1,aes(fill = bio1)) +
 #   coord_equal() + scale_fill_viridis(name = "Estimation") +
 #   geom_point( size=3,color = rgb(0.2,0.2,0.2,0.1))
+#####chercher l'information sur la zone d'étude 1(zone 1)
 zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre\\Zone_1_BON.shp")
 z1<-st_as_sf(zone_etude1)
+###########répresentation graphique des présence/absence de Faidherbia albida dans la zone 1
 plotPAZ1<-ggplot(map1)   +
   geom_sf(aes(color = Faidherbia)) +
   geom_sf(data = z1, colour = "black", fill = NA)  +
@@ -80,7 +80,7 @@ plotPAZ1<-ggplot(map1)   +
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
                          style = north_arrow_fancy_orienteering)
 ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ1.png",plotPAZ1)
-
+#############################################################
 
 ########Model Faidherbia albida
 Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
@@ -92,7 +92,6 @@ joint1<-Base_Faidherbia_Z1 %>%
 
 
 #Enregistrements en double pour l'espèce
-# which records are duplicates (only for the first 10 columns)?
 dups <- duplicated(Base_Faidherbia_Z1[, 1:3])
 class(dups)
 table(dups)
