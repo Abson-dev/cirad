@@ -34,6 +34,9 @@ Base_Espece_Zone4<-data_df %>%
 Base_Espece_Zone4<-data_df %>%
   filter(Zone == 4)
 ###################Modélisation dans la zone 1, avec les variables de worldClim
+Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
+  select(xcoord,ycoord,Faidherbia_albida)
+names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
 class(Base_Faidherbia_Z1)
 FZ1<-Base_Faidherbia_Z1
 view(FZ1)
@@ -84,9 +87,7 @@ ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ1.p
 #############################################################
 
 ########Model Faidherbia albida
-Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
-  select(xcoord,ycoord,Faidherbia_albida)
-names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
+
 joint1<-Base_Faidherbia_Z1 %>%
   select(lon,lat)
 
