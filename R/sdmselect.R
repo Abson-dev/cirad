@@ -19,10 +19,10 @@ worlClim<-stack(l1)
 ext<-extent(Species)
 ###4)utiliser crop pour mettre a la même zone d'étude les données de worlclim
 worldClim.crop<-crop(worlClim,ext)
-plot(worldClim.crop$bio1)
+plot(worldClim.crop$bio6)
 library(rasterVis)
 library(RStoolbox)
-ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "log") +
+ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "hist",hue=0.5) +
   scale_fill_gradientn(colours = terrain.colors(100), name = "elevation") +
   theme(axis.text = element_text(size=5), 
         axis.text.y = element_text(angle=90),
