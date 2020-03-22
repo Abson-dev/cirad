@@ -120,6 +120,7 @@ map4$Faidherbia<-as.factor(map4$Faidherbia)
 ##zone 1
 zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp")
 z1<-st_as_sf(zone_etude1)
+
 ##zone 2
 zone_etude2<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_2_BON.shp")
 z2<-st_as_sf(zone_etude2)
@@ -176,6 +177,14 @@ table(dups)
 ################ Autocorrélation spatiale
 ########"
 library(spdep)
+###zone 1
+Base_FZ1<-Base_Faidherbia_Z1
+Base_FZ1$Faidherbia<-as.factor(Base_FZ1$Faidherbia)
+###conversion en facteur
+Faidherbia <- as.factor(Base_FZ1$Faidherbia,levels=c("presence","absence"))
+
+
+
 
 #############1 avec le corrélogramme de SDMSelect
 ######zone 1
@@ -183,6 +192,21 @@ data.prepared1<-Prepare_dataset(x=dataFZ1,var=1,cov = 2:ncol(dataFZ1),datatype =
 ######zone 2
 data.prepared2<-Prepare_dataset(x=dataFZ2,var=1,cov = 2:ncol(dataFZ2),datatype = "PA",na.rm = TRUE)
 library(gstat)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
