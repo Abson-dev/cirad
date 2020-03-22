@@ -33,7 +33,7 @@ Base_Espece_Zone4<-data_df %>%
   filter(Zone == 3)
 Base_Espece_Zone4<-data_df %>%
   filter(Zone == 4)
-###################Modélisation dans la zone 1, avec les variables de worldClim
+###################Faidherbia albida dans la zone 1
 Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
   select(xcoord,ycoord,Faidherbia_albida)
 names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
