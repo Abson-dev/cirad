@@ -116,3 +116,10 @@ plotPA_B_Z4<-ggplot(map_B_4)   +
                          style = north_arrow_fancy_orienteering)
 ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Balanites Model\\PA_BalanitesZ4.png",plotPA_B_Z4)
 #############################################################
+#Enregistrements en double pour l'espèce
+dups <- duplicated(Base_Balanites_Z1[, 1:3])
+class(dups)
+table(dups)
+#???pas de doublon
+################ Autocorrélation spatiale
+library(gstat)
