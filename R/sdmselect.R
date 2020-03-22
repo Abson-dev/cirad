@@ -22,7 +22,11 @@ worldClim.crop<-crop(worlClim,ext)
 plot(worldClim.crop$bio1)
 library(rasterVis)
 library(RStoolbox)
-ggRGB(worldClim.crop$bio1,r=1,g=2,b=3)
+ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "log") +
+  scale_fill_gradientn(colours = terrain.colors(100), name = "elevation") +
+  theme(axis.text = element_text(size=5), 
+        axis.text.y = element_text(angle=90),
+        axis.title=element_blank())
 library(sf)
 #####supprimer la géométrie afin de pouvoir faire quelques manipulations
 data_df<-st_drop_geometry(Base_Espece)
