@@ -22,7 +22,7 @@ worldClim.crop<-crop(worlClim,ext)
 plot(worldClim.crop$bio1)
 library(rasterVis)
 library(RStoolbox)
-ggRGB(worldClim.crop,r=1,g=2,b=3)
+ggRGB(worldClim.crop$bio1,r=1,g=2,b=3)
 library(sf)
 #####supprimer la géométrie afin de pouvoir faire quelques manipulations
 data_df<-st_drop_geometry(Base_Espece)
