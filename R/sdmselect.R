@@ -174,6 +174,9 @@ class(dups)
 table(dups)
 #???pas de doublon
 ################ Autocorrélation spatiale
+########"
+library(spdep)
+
 #############1 avec le corrélogramme de SDMSelect
 ######zone 1
 data.prepared1<-Prepare_dataset(x=dataFZ1,var=1,cov = 2:ncol(dataFZ1),datatype = "PA",na.rm = TRUE)
