@@ -122,4 +122,6 @@ class(dups)
 table(dups)
 #???pas de doublon
 ################ Autocorrélation spatiale
+#############1 avec le corrélogramme de SDMSelect
+
 library(gstat)
