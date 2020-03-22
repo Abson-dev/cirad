@@ -70,7 +70,7 @@ map1$Faidherbia<-as.factor(map1$Faidherbia)
 #   coord_equal() + scale_fill_viridis(name = "Estimation") +
 #   geom_point( size=3,color = rgb(0.2,0.2,0.2,0.1))
 #####chercher l'information sur la zone d'étude 1(zone 1)
-zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre\\Zone_1_BON.shp")
+zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp")
 z1<-st_as_sf(zone_etude1)
 ###########répresentation graphique des présence/absence de Faidherbia albida dans la zone 1
 plotPAZ1<-ggplot(map1)   +
