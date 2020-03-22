@@ -1,15 +1,17 @@
 library(SDMSelect)
 library(dplyr)
 Base_Espece<-Species
-Base_Espece$Faidherbia_albida<-if_else(Base_Espece$Species =="Faidherbia albida",1,0)
+Base_Espece$Faidherbia_albida<-if_else(Base_Espece$Species =="Faidherbia albida","1","0")
+Base_Espece$Faidherbia_albida<-as.factor(Base_Espece$Faidherbia_albida)
 #Balanites aegyptiaca
-Base_Espece$Balanites_aegyptiaca<-if_else(Base_Espece$Species =="Balanites aegyptiaca",1,0)
+Base_Espece$Balanites_aegyptiaca<-as.factor(if_else(Base_Espece$Species =="Balanites aegyptiaca","1","0"))
+
 #Anogeissus leiocarpus
-Base_Espece$Anogeissus_leiocarpus<-if_else(Base_Espece$Species =="Anogeissus leiocarpus",1,0)
+Base_Espece$Anogeissus_leiocarpus<-as.factor(if_else(Base_Espece$Species =="Anogeissus leiocarpus","1","0"))
 #Adansonia digitata
-Base_Espece$Adansonia_digitata<-if_else(Base_Espece$Species =="Adansonia digitata",1,0)
+Base_Espece$Adansonia_digitata<-as.factor(if_else(Base_Espece$Species =="Adansonia digitata","1","0"))
 #Acacia nilotica
-Base_Espece$Acacia_nilotica<-if_else(Base_Espece$Species =="Acacia nilotica",1,0)
+Base_Espece$Acacia_nilotica<-as.factor(if_else(Base_Espece$Species =="Acacia nilotica","1","0"))
 ##############
 l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
@@ -17,56 +19,106 @@ worlClim<-stack(l1)
 covar<-names(worlClim)
 ext<-extent(Species)
 worldClim.crop<-crop(worlClim,ext)
+plot(worldClim.crop$bio1)
 
 #data<-CovarExtract(x=Base_Espece,cov.paths = l1)
 library(sf)
 data_df<-st_drop_geometry(Base_Espece)
 class(data_df)
-# data_Faidherbia<-data_df %>%
-#   filter(Faidherbia_albida==1)
-# Faidherbia<-data_Faidherbia %>%
-#   select(xcoord,ycoord)
 
-# data.prepared<-Prepare_dataset(x=data, var = 1,cov =covar, datatype = "PA", na.rm = TRUE )
-# plot(worldClim.crop,1)
-# points(Faidherbia,col='blue')
-#############zones
-# data_Faidherbia_1<-data_Faidherbia %>%
-#   filter(Zone==1)
-# Faidherbia_1<-data_Faidherbia_1 %>%
-#   select(xcoord,ycoord)
-# plot(worldClim.crop,1)
-# plot(zone_etude, add=TRUE)
-# points(Faidherbia_1,col='blue')
-#######################################
 ##########???les espèces dans les différentes zones
-Base_Espece_Zone1<-data_sf %>%
+Base_Espece_Zone1<-data_df %>%
   filter(Zone == 1)
-Base_Espece_Zone2<-data_sf %>%
+Base_Espece_Zone2<-data_df %>%
   filter(Zone == 2)
-Base_Espece_Zone4<-data_sf %>%
+Base_Espece_Zone4<-data_df %>%
   filter(Zone == 3)
-Base_Espece_Zone4<-data_sf %>%
+Base_Espece_Zone4<-data_df %>%
   filter(Zone == 4)
 ###################Modélisation dans la zone 1, avec les variables de worldClim
-########Faidherbia albida
+#extract covariables, combine with dataset 
+#Transform data as SpatialPointDataFrame
+class(Base_Faidherbia_Z1)
+FZ1<-Base_Faidherbia_Z1
+view(FZ1)
+sp::coordinates(FZ1) <-~lon+lat
+sp::proj4string(FZ1) <-"+proj=longlat +datum=WGS84"
+dataFZ1<-CovarExtract(x=FZ1,cov.paths = l1) # en utilsisant SDMSelect
+
+library(maptools)
+library(rgdal) 
+tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions"
+writeOGR(obj=dataFZ1,dsn=tmpdir,layer="dataFZ1",driver="ESRI Shapefile")
+filename_PA_Z1<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataFZ1.shp")
+PA_FZ1<-shapefile(filename_PA_Z1)
+map1<-st_as_sf(PA_FZ1)
+map1$Faidherbia<-if_else(map1$Faidherbia ==1,"présence","absence")
+map1$Faidherbia<-as.factor(map1$Faidherbia)
+# mf1<-map1
+# mf1$Faidherbia<-if_else(mf1$Faidherbia =="présence","1","0")
+# mf1$Faidherbia<-as.factor(mf1$Faidherbia)
+# dataF1<-dataFZ1@data
+# dataF1$Faidherbia<-as.factor(dataF1$Faidherbia)
+# Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
+#   select(xcoord,ycoord,Faidherbia_albida)
+# names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
+# joint1<-Base_Faidherbia_Z1 %>%
+#   select(lon,lat)
+# rasterFZ1<-cbind(dataF1,joint1)
+# library(viridis)
+# p <- ggplot(rasterFZ1, aes(lon,lat)) +
+#   geom_raster(data= rasterFZ1,aes(fill = bio1)) +
+#   coord_equal() + scale_fill_viridis(name = "Estimation") +
+#   geom_point( size=3,color = rgb(0.2,0.2,0.2,0.1))
+zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre\\Zone_1_BON.shp")
+z1<-st_as_sf(zone_etude1)
+plotPAZ1<-ggplot(map1)   +
+  geom_sf(aes(color = Faidherbia)) +
+  geom_sf(data = z1, colour = "black", fill = NA) +
+  geom_raster(data= map1,aes(fill = bio1)) +
+  theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+                         style = north_arrow_fancy_orienteering)
+ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ1.png",plotPAZ1)
+
+
+########Model Faidherbia albida
 Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
   select(xcoord,ycoord,Faidherbia_albida)
 names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
-#Transform data as SpatialPointDataFrame
-sp::coordinates(Base_Faidherbia_Z1) <-~lon+lat
-sp::proj4string(Base_Faidherbia_Z1) <-"+proj=longlat +datum=WGS84"
-#extract covariables, combine with dataset 
-data<-CovarExtract(x=Base_Faidherbia_Z1,cov.paths = l1)
-names(data)
-#show observations positions
-par(mar=c(1,1,1,1))
-raster::plot(worldClim.crop,"wc2.0_bio_30s_01")
-sp::plot(zone_etude, add=T)
-sp::plot(data,col=c("red","blue")[data@data$Faidherbia + 1],pch=20, cex=c(0.5,1)[data@data$Faidherbia + 1],add=T)
+joint1<-Base_Faidherbia_Z1 %>%
+  select(lon,lat)
+
+
+
+#Enregistrements en double pour l'espèce
+# which records are duplicates (only for the first 10 columns)?
+dups <- duplicated(Base_Faidherbia_Z1[, 1:3])
+class(dups)
+table(dups)
+#???pas de doublon
+#Vérification croisée
+
+#sp::proj4string(zone_etude1) <-"+proj=longlat +datum=WGS84"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###################Model avec SDMSelect
 #prepare the spatial dataset for modelling
 data.prepared<-Prepare_dataset(x=data,var=1,cov = 2:ncol(data),datatype = "PA",na.rm = TRUE)
-tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions"
+tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions\\SDMSelect"
 thd <- spatialcor_dist(
   x = data.prepared, longlat = !is.projected(data),
   binomial = TRUE, saveWD = tmpdir,
@@ -83,7 +135,7 @@ data.new <- Prepare_dataset(
 
 # Plot data.new
 par(mar = c(1,1,1,1))
-raster::plot(worldClim.crop, "wc2.0_bio_30s_01")
+raster::plot(worldClim.crop, "bio1")
 sp::plot(zone_etude, add = TRUE)
 sp::plot(data.new, 
          col = c("red", "blue")[data.new@data$dataY + 1],
@@ -112,7 +164,8 @@ res.file <- ModelResults(saveWD = tmpdir, plot = TRUE,
                          Num = Num.Best)
 #Species distribution mapping
 #Probability of presence
-pred.r <- Map_predict(object = covariates, saveWD = tmpdir, Num = Num.Best)
+covariates<-Prepare_covarStack(cov.paths = l1)
+pred.r <- Map_predict(object = worlClim$bio2, saveWD = tmpdir, Num = Num.Best)
 
 predr <- system.file("SDM_Selection", "predr.tif", package = "SDMSelect")
 pred.r <- raster::stack(predr)
@@ -175,3 +228,4 @@ rasterVis::gplot(raster::dropLayer(pred.r, which(!grepl("mask", names(pred.r))))
   facet_grid(~variable) +
   scale_fill_manual("mask", values = c("0" = "red", "1" = "forestgreen")) +
   coord_equal()
+##############################end SDMSelect
