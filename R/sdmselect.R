@@ -74,8 +74,7 @@ zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre\\Zone_1_B
 z1<-st_as_sf(zone_etude1)
 plotPAZ1<-ggplot(map1)   +
   geom_sf(aes(color = Faidherbia)) +
-  geom_sf(data = z1, colour = "black", fill = NA) +
-  geom_raster(data= map1,aes(fill = bio1)) +
+  geom_sf(data = z1, colour = "black", fill = NA)  +
   theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
   annotation_north_arrow(location = "bl", which_north = "true",
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
