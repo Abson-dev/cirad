@@ -20,6 +20,9 @@ ext<-extent(Species)
 ###4)utiliser crop pour mettre a la même zone d'étude les données de worlclim
 worldClim.crop<-crop(worlClim,ext)
 plot(worldClim.crop$bio1)
+library(rasterVis)
+library(RStoolbox)
+ggRGB(worldClim.crop,r=1,g=2,b=3)
 library(sf)
 #####supprimer la géométrie afin de pouvoir faire quelques manipulations
 data_df<-st_drop_geometry(Base_Espece)
