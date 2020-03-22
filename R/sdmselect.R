@@ -29,53 +29,109 @@ Base_Espece_Zone1<-data_df %>%
   filter(Zone == 1)
 Base_Espece_Zone2<-data_df %>%
   filter(Zone == 2)
-Base_Espece_Zone4<-data_df %>%
+Base_Espece_Zone3<-data_df %>%
   filter(Zone == 3)
 Base_Espece_Zone4<-data_df %>%
   filter(Zone == 4)
-###################Faidherbia albida dans la zone 1
+###################Faidherbia albida dans les zones
+####zone 1
 Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
   select(xcoord,ycoord,Faidherbia_albida)
 names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
-class(Base_Faidherbia_Z1)
 FZ1<-Base_Faidherbia_Z1
-view(FZ1)
+####zone 2
+Base_Faidherbia_Z2<-Base_Espece_Zone2 %>%
+  select(xcoord,ycoord,Faidherbia_albida)
+names(Base_Faidherbia_Z2)<-c("lon","lat","Faidherbia")
+FZ2<-Base_Faidherbia_Z2
+####zone 3
+Base_Faidherbia_Z3<-Base_Espece_Zone3 %>%
+  select(xcoord,ycoord,Faidherbia_albida)
+names(Base_Faidherbia_Z3)<-c("lon","lat","Faidherbia")
+FZ3<-Base_Faidherbia_Z3
+####???zone 4
+Base_Faidherbia_Z4<-Base_Espece_Zone4 %>%
+  select(xcoord,ycoord,Faidherbia_albida)
+names(Base_Faidherbia_Z4)<-c("lon","lat","Faidherbia")
+FZ4<-Base_Faidherbia_Z4
+##################fin zones
 #Transform data as SpatialPointDataFrame
+###zone 1
 sp::coordinates(FZ1) <-~lon+lat
 sp::proj4string(FZ1) <-"+proj=longlat +datum=WGS84"
+###zone 2
+sp::coordinates(FZ2) <-~lon+lat
+sp::proj4string(FZ2) <-"+proj=longlat +datum=WGS84"
+###zone 3
+sp::coordinates(FZ3) <-~lon+lat
+sp::proj4string(FZ3) <-"+proj=longlat +datum=WGS84"
+###zone 4
+sp::coordinates(FZ4) <-~lon+lat
+sp::proj4string(FZ4) <-"+proj=longlat +datum=WGS84"
+##############"fin zones
 #extract covariables, combine with dataset 
+###zone 1
 dataFZ1<-CovarExtract(x=FZ1,cov.paths = l1) # en utilsisant SDMSelect
+###zone 2
+dataFZ2<-CovarExtract(x=FZ2,cov.paths = l1)
+###zone 3
+dataFZ3<-CovarExtract(x=FZ3,cov.paths = l1)
+###zone 4
+dataFZ4<-CovarExtract(x=FZ4,cov.paths = l1)
+#############fins zones
 ############## exporter dataFZ1 en .shp
 library(maptools)
 library(rgdal) 
 tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions"
+##zone 1
 writeOGR(obj=dataFZ1,dsn=tmpdir,layer="dataFZ1",driver="ESRI Shapefile")
-############### importer dataFZ1.shp
+##zone 2
+writeOGR(obj=dataFZ2,dsn=tmpdir,layer="dataFZ2",driver="ESRI Shapefile")
+##zone 3
+writeOGR(obj=dataFZ3,dsn=tmpdir,layer="dataFZ3",driver="ESRI Shapefile")
+##zone 4
+writeOGR(obj=dataFZ4,dsn=tmpdir,layer="dataFZ4",driver="ESRI Shapefile")
+############### importer dataFZ1.shp,dataFZ2.shp,dataFZ3.shp,dataFZ4.shp
+##zone 1
 filename_PA_Z1<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataFZ1.shp")
 PA_FZ1<-shapefile(filename_PA_Z1)
 map1<-st_as_sf(PA_FZ1)
 map1$Faidherbia<-if_else(map1$Faidherbia ==1,"présence","absence")
 map1$Faidherbia<-as.factor(map1$Faidherbia)
-# mf1<-map1
-# mf1$Faidherbia<-if_else(mf1$Faidherbia =="présence","1","0")
-# mf1$Faidherbia<-as.factor(mf1$Faidherbia)
-# dataF1<-dataFZ1@data
-# dataF1$Faidherbia<-as.factor(dataF1$Faidherbia)
-# Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
-#   select(xcoord,ycoord,Faidherbia_albida)
-# names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
-# joint1<-Base_Faidherbia_Z1 %>%
-#   select(lon,lat)
-# rasterFZ1<-cbind(dataF1,joint1)
-# library(viridis)
-# p <- ggplot(rasterFZ1, aes(lon,lat)) +
-#   geom_raster(data= rasterFZ1,aes(fill = bio1)) +
-#   coord_equal() + scale_fill_viridis(name = "Estimation") +
-#   geom_point( size=3,color = rgb(0.2,0.2,0.2,0.1))
-#####chercher l'information sur la zone d'étude 1(zone 1)
+##zone 2
+filename_PA_Z2<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataFZ2.shp")
+PA_FZ2<-shapefile(filename_PA_Z2)
+map2<-st_as_sf(PA_FZ2)
+map2$Faidherbia<-if_else(map2$Faidherbia ==1,"présence","absence")
+map2$Faidherbia<-as.factor(map2$Faidherbia)
+##zone 3
+filename_PA_Z3<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataFZ3.shp")
+PA_FZ3<-shapefile(filename_PA_Z3)
+map3<-st_as_sf(PA_FZ3)
+map3$Faidherbia<-if_else(map3$Faidherbia ==1,"présence","absence")
+map3$Faidherbia<-as.factor(map3$Faidherbia)
+##zone 4
+filename_PA_Z4<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataFZ4.shp")
+PA_FZ4<-shapefile(filename_PA_Z4)
+map4<-st_as_sf(PA_FZ4)
+map4$Faidherbia<-if_else(map4$Faidherbia ==1,"présence","absence")
+map4$Faidherbia<-as.factor(map4$Faidherbia)
+##########.shp des zones 
+##zone 1
 zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp")
 z1<-st_as_sf(zone_etude1)
-###########répresentation graphique des présence/absence de Faidherbia albida dans la zone 1
+##zone 2
+zone_etude2<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_2_BON.shp")
+z2<-st_as_sf(zone_etude2)
+##zone 3
+zone_etude3<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_3_BON.shp")
+z3<-st_as_sf(zone_etude3)
+##zone 4
+zone_etude4<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_4_BON.shp")
+z4<-st_as_sf(zone_etude4)
+#########"fin zones
+###########répresentation graphique des présence/absence de Faidherbia albida dans les zones
+##zone 1
 plotPAZ1<-ggplot(map1)   +
   geom_sf(aes(color = Faidherbia)) +
   geom_sf(data = z1, colour = "black", fill = NA)  +
@@ -84,6 +140,33 @@ plotPAZ1<-ggplot(map1)   +
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
                          style = north_arrow_fancy_orienteering)
 ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ1.png",plotPAZ1)
+##zone 2
+plotPAZ2<-ggplot(map2)   +
+  geom_sf(aes(color = Faidherbia)) +
+  geom_sf(data = z2, colour = "black", fill = NA)  +
+  theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+                         style = north_arrow_fancy_orienteering)
+ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ2.png",plotPAZ2)
+##zone 3
+plotPAZ3<-ggplot(map3)   +
+  geom_sf(aes(color = Faidherbia)) +
+  geom_sf(data = z3, colour = "black", fill = NA)  +
+  theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+                         style = north_arrow_fancy_orienteering)
+ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ3.png",plotPAZ3)
+##zone 4
+plotPAZ4<-ggplot(map4)   +
+  geom_sf(aes(color = Faidherbia)) +
+  geom_sf(data = z4, colour = "black", fill = NA)  +
+  theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+                         style = north_arrow_fancy_orienteering)
+ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ4.png",plotPAZ4)
 #############################################################
 
 ########Model Faidherbia albida
