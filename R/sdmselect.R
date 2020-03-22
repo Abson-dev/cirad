@@ -168,24 +168,13 @@ plotPAZ4<-ggplot(map4)   +
                          style = north_arrow_fancy_orienteering)
 ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Faidherbia Model\\PA_FaidherbiaZ4.png",plotPAZ4)
 #############################################################
-
-########Model Faidherbia albida
-
-joint1<-Base_Faidherbia_Z1 %>%
-  select(lon,lat)
-
-
-
 #Enregistrements en double pour l'espèce
 dups <- duplicated(Base_Faidherbia_Z1[, 1:3])
 class(dups)
 table(dups)
 #???pas de doublon
-#Vérification croisée
-
-#sp::proj4string(zone_etude1) <-"+proj=longlat +datum=WGS84"
-
-
+################ Autocorrélation spatiale
+library(gstat)
 
 
 
