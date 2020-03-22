@@ -42,11 +42,12 @@ sp::coordinates(FZ1) <-~lon+lat
 sp::proj4string(FZ1) <-"+proj=longlat +datum=WGS84"
 #extract covariables, combine with dataset 
 dataFZ1<-CovarExtract(x=FZ1,cov.paths = l1) # en utilsisant SDMSelect
-############## 
+############## exporter dataFZ1 en .shp
 library(maptools)
 library(rgdal) 
 tmpdir<-"C:\\Users\\Hp\\OneDrive\\redactions"
 writeOGR(obj=dataFZ1,dsn=tmpdir,layer="dataFZ1",driver="ESRI Shapefile")
+############### importer dataFZ1.shp
 filename_PA_Z1<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataFZ1.shp")
 PA_FZ1<-shapefile(filename_PA_Z1)
 map1<-st_as_sf(PA_FZ1)
