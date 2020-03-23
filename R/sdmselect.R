@@ -188,8 +188,15 @@ library(spdep)
 Base_FZ1<-Base_Faidherbia_Z1
 Base_FZ1$Faidherbia<-as.factor(Base_FZ1$Faidherbia)
 ###conversion en facteur
-Faidherbia <- as.factor(Base_FZ1$Faidherbia,levels=c("presence","absence"))
-
+Faidherbia <- Base_FZ1$Faidherbia
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ1) <-~lon+lat
+sp::proj4string(Base_FZ1) <-"+proj=longlat +datum=WGS84"
+Base_FZ1 <- spTransform (Base_FZ1, CRS ("+no_defs +ellps=WGS84 +towgs84=0,0,0
++proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0                                                            :2154") )
+menir75.nb<- knn2nb(knearneigh(Base_FZ1,k=2))
+#Mise en oeuvre du test
+joincount.test(Faidherbia,listw2U(nb2listw(menir75.nb)))
 
 
 
