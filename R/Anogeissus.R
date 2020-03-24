@@ -1,4 +1,10 @@
 ###################Anogeissus albida dans les zones
+#Anogeissus leiocarpus
+Base_Espece$Anogeissus_leiocarpus<-as.factor(if_else(Base_Espece$Species =="Anogeissus leiocarpus","1","0"))
+#zone d'étude
+Base_Anogeissus_Z<-data_df %>%
+  select(xcoord,ycoord,Anogeissus_leiocarpus)
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus")
 ####zone 1
 Base_Anogeissus_Z1<-Base_Espece_Zone1 %>%
   select(xcoord,ycoord,Anogeissus_leiocarpus)
@@ -116,3 +122,90 @@ plotPA_A_Z4<-ggplot(map_A_4)   +
                          style = north_arrow_fancy_orienteering)
 ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\Anogeissus Model\\PA_AnogeissusZ4.png",plotPA_A_Z4)
 #############################################################
+#Enregistrements en double pour l'espèce
+dups <- duplicated(Base_Anogeissus_Z1[, 1:3])
+class(dups)
+table(dups)
+#???pas de doublon
+################ Autocorrélation spatiale
+########"
+library(spdep)
+#zone d'étude
+Base_AZ<-Base_Anogeissus_Z
+Base_AZ$Anogeissus<-as.factor(Base_AZ$Anogeissus)
+###conversion en facteur
+Anogeissus <- Base_AZ$Anogeissus
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_AZ) <-~lon+lat
+sp::proj4string(Base_AZ) <-"+proj=longlat +datum=WGS84"
+voisins<- knn2nb(knearneigh(Base_AZ,k=5))
+
+#Mise en oeuvre du test
+joincount.test(Anogeissus,listw2U(nb2listw(voisins)))
+print(joincount.multi(Anogeissus,listw2U(nb2listw(voisins))))
+xtable(joincount.multi(Anogeissus,listw2U(nb2listw(voisins))))
+###zone 1
+Base_AZ1<-Base_Anogeissus_Z1
+Base_AZ1$Anogeissus<-as.factor(Base_AZ1$Anogeissus)
+###conversion en facteur
+Anogeissus <- Base_AZ1$Anogeissus
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_AZ1) <-~lon+lat
+sp::proj4string(Base_AZ1) <-"+proj=longlat +datum=WGS84"
+voisins<- knn2nb(knearneigh(Base_AZ1,k=5))
+
+#Mise en oeuvre du test
+joincount.test(Anogeissus,listw2U(nb2listw(voisins)))
+print(joincount.multi(Anogeissus,listw2U(nb2listw(voisins))))
+xtable(joincount.multi(Anogeissus,listw2U(nb2listw(voisins))))
+#???Jointcount_FZ1<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(61.25,8.25,27.00),Esperance=c(56.6562,5.1562,34.6875),Variance=c(3.0378,1.4507,6.0339),z_value=c(2.6357,2.5686,-3.1296))
+#localG()
+###zone 3
+Base_AZ3<-Base_Anogeissus_Z3
+Base_AZ3$Anogeissus<-as.factor(Base_AZ3$Anogeissus)
+###conversion en facteur
+Anogeissus <- Base_AZ3$Anogeissus
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_AZ3) <-~lon+lat
+sp::proj4string(Base_AZ3) <-"+proj=longlat +datum=WGS84"
+voisins3<- knn2nb(knearneigh(Base_AZ3,k=5))
+#Mise en oeuvre du test
+joincount.test(Anogeissus,listw2U(nb2listw(voisins3)))
+print(joincount.multi(Anogeissus,listw2U(nb2listw(voisins3))))
+xtable(joincount.multi(Anogeissus,listw2U(nb2listw(voisins3))))
+#???Jointcount_FZ3<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#localG()
+###zone 2
+Base_AZ2<-Base_Anogeissus_Z2
+Base_AZ2$Anogeissus<-as.factor(Base_AZ2$Anogeissus)
+###conversion en facteur
+Anogeissus <- Base_AZ2$Anogeissus
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_AZ2) <-~lon+lat
+sp::proj4string(Base_AZ2) <-"+proj=longlat +datum=WGS84"
+voisins2<- knn2nb(knearneigh(Base_AZ2,k=5))
+#Mise en oeuvre du test
+joincount.test(Anogeissus,listw2U(nb2listw(voisins2)))
+print(joincount.multi(Anogeissus,listw2U(nb2listw(voisins2))))
+xtable(joincount.multi(Anogeissus,listw2U(nb2listw(voisins2))))
+Jointcount_FZ2<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(553.75,329.00,440.25),Esperance=c(441.647,235.647,645.706),Variance=c(50.698,42.594,134.574),z_value=c(15.744,14.304,-17.711))
+#localG()
+###zone 4
+Base_AZ4<-Base_Anogeissus_Z4
+Base_AZ4$Anogeissus<-as.factor(Base_AZ4$Anogeissus)
+###conversion en facteur
+Anogeissus <- Base_AZ4$Anogeissus
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_AZ4) <-~lon+lat
+sp::proj4string(Base_AZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_AZ4,k=5))
+#Mise en oeuvre du test
+joincount.test(Anogeissus,listw2U(nb2listw(voisins4)))
+xtable(joincount.multi(Anogeissus,listw2U(nb2listw(voisins4))))
+#Jointcount_FZ4<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#localG()
+library(xtable)
+xtable(joincount.multi(Anogeissus,listw2U(nb2listw(voisins4))))
+
+
+#############1 avec le corrélogramme de SDMSelect
