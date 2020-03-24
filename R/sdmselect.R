@@ -44,7 +44,7 @@ ggplot(map) + geom_sf()+   ggR(worldClim.crop, 1, stretch = "hist",hue=0.5,geom_
 library(rasterVis)
 library(RStoolbox)
 ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "hist",hue=0.5,ggLayer = F) +
-  scale_fill_gradientn(colours = terrain.colors(100), name = "elevation") +
+  scale_fill_gradientn(colours = terrain.colors(100), name = "bio1") +
   theme(axis.text = element_text(size=5), 
         axis.text.y = element_text(angle=90),
         axis.title=element_blank())
