@@ -21,6 +21,20 @@ ext<-extent(Species)
 worldClim.crop<-crop(worlClim,ext)
 plot(worldClim.crop,1:9)
 plot(worldClim.crop,10:19)
+filename_zone<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones","\\Diohine_Echanti_Classif.shp")
+filename_zone
+zone_etude<-shapefile(filename_zone)
+plot(zone_etude)
+map<-st_as_sf(zone_etude)
+map$Zone<-as.factor(map$Zone)
+ggplot(map)  + geom_sf(aes(fill=Zone),colour="green") + 
+  theme_gray() + annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+                         style = north_arrow_fancy_orienteering)+
+  ggR(worldClim.crop, 1, stretch = "hist",hue=0.5,ggLayer = TRUE) +
+  scale_fill_gradientn(colours = terrain.colors(100)) 
+  
 library(rasterVis)
 library(RStoolbox)
 ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "hist",hue=0.5) +
