@@ -61,6 +61,7 @@ writeOGR(obj=dataAdZ4,dsn=tmpdir,layer="dataAdZ4",driver="ESRI Shapefile")
 ############### importer dataAdZ1.shp,dataAdZ2.shp,dataAdZ3.shp,dataAdZ4.shp
 ##zone 1
 filename_PA_A_Z1<-paste0("C:\\Users\\Hp\\OneDrive\\redactions","\\dataAdZ1.shp")
+library(raster)
 PA_AdZ1<-shapefile(filename_PA_A_Z1)
 map_Ad_1<-st_as_sf(PA_AdZ1)
 map_Ad_1$Adansonia<-if_else(map_Ad_1$Adansonia ==1,"présence","absence")
@@ -86,6 +87,8 @@ map_Ad_4$Adansonia<-as.factor(map_Ad_4$Adansonia)
 ##########.shp des zones déjà importer
 ###########répresentation graphique des présence/absence de Adansonia  dans les zones
 ##zone 1
+library(ggplot2)
+library(ggspatial)
 plotPA_Ad_Z1<-ggplot(map_Ad_1)   +
   geom_sf(aes(color = Adansonia)) +
   geom_sf(data = z1, colour = "black", fill = NA)  +
