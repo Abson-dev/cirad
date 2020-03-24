@@ -1,4 +1,10 @@
+#Balanites aegyptiaca
+Base_Espece$Balanites_aegyptiaca<-as.factor(if_else(Base_Espece$Species =="Balanites aegyptiaca","1","0"))
 ###################Balanites albida dans les zones
+#zone d'étude
+Base_Balanites_Z<-data_df %>%
+  select(xcoord,ycoord,Balanites_aegyptiaca)
+names(Base_Balanites_Z)<-c("lon","lat","Balanites")
 ####zone 1
 Base_Balanites_Z1<-Base_Espece_Zone1 %>%
   select(xcoord,ycoord,Balanites_aegyptiaca)
@@ -122,6 +128,87 @@ class(dups)
 table(dups)
 #???pas de doublon
 ################ Autocorrélation spatiale
+########"
+library(spdep)
+#zone d'étude
+Base_BZ<-Base_Balanites_Z
+Base_BZ$Balanites<-as.factor(Base_BZ$Balanites)
+###conversion en facteur
+Balanites <- Base_BZ$Balanites
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_BZ) <-~lon+lat
+sp::proj4string(Base_BZ) <-"+proj=longlat +datum=WGS84"
+voisins<- knn2nb(knearneigh(Base_BZ,k=5))
+
+#Mise en oeuvre du test
+joincount.test(Balanites,listw2U(nb2listw(voisins)))
+print(joincount.multi(Balanites,listw2U(nb2listw(voisins))))
+xtable(joincount.multi(Balanites,listw2U(nb2listw(voisins))))
+###zone 1
+Base_BZ1<-Base_Balanites_Z1
+Base_BZ1$Balanites<-as.factor(Base_BZ1$Balanites)
+###conversion en facteur
+Balanites <- Base_BZ1$Balanites
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_BZ1) <-~lon+lat
+sp::proj4string(Base_BZ1) <-"+proj=longlat +datum=WGS84"
+voisins<- knn2nb(knearneigh(Base_BZ1,k=5))
+
+#Mise en oeuvre du test
+joincount.test(Balanites,listw2U(nb2listw(voisins)))
+print(joincount.multi(Balanites,listw2U(nb2listw(voisins))))
+xtable(joincount.multi(Balanites,listw2U(nb2listw(voisins))))
+#???Jointcount_FZ1<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(61.25,8.25,27.00),Esperance=c(56.6562,5.1562,34.6875),Variance=c(3.0378,1.4507,6.0339),z_value=c(2.6357,2.5686,-3.1296))
+#localG()
+###zone 3
+Base_BZ3<-Base_Balanites_Z3
+Base_BZ3$Balanites<-as.factor(Base_BZ3$Balanites)
+###conversion en facteur
+Balanites <- Base_BZ3$Balanites
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_BZ3) <-~lon+lat
+sp::proj4string(Base_BZ3) <-"+proj=longlat +datum=WGS84"
+voisins3<- knn2nb(knearneigh(Base_BZ3,k=5))
+#Mise en oeuvre du test
+joincount.test(Balanites,listw2U(nb2listw(voisins3)))
+print(joincount.multi(Balanites,listw2U(nb2listw(voisins3))))
+xtable(joincount.multi(Balanites,listw2U(nb2listw(voisins3))))
+#???Jointcount_FZ3<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#localG()
+###zone 2
+Base_BZ2<-Base_Balanites_Z2
+Base_BZ2$Balanites<-as.factor(Base_BZ2$Balanites)
+###conversion en facteur
+Balanites <- Base_BZ2$Balanites
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_BZ2) <-~lon+lat
+sp::proj4string(Base_BZ2) <-"+proj=longlat +datum=WGS84"
+voisins2<- knn2nb(knearneigh(Base_BZ2,k=5))
+#Mise en oeuvre du test
+joincount.test(Balanites,listw2U(nb2listw(voisins2)))
+print(joincount.multi(Balanites,listw2U(nb2listw(voisins2))))
+xtable(joincount.multi(Balanites,listw2U(nb2listw(voisins2))))
+Jointcount_FZ2<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(553.75,329.00,440.25),Esperance=c(441.647,235.647,645.706),Variance=c(50.698,42.594,134.574),z_value=c(15.744,14.304,-17.711))
+#localG()
+###zone 4
+Base_BZ4<-Base_Balanites_Z4
+Base_BZ4$Balanites<-as.factor(Base_BZ4$Balanites)
+###conversion en facteur
+Balanites <- Base_BZ4$Balanites
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_BZ4) <-~lon+lat
+sp::proj4string(Base_BZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_BZ4,k=5))
+#Mise en oeuvre du test
+joincount.test(Balanites,listw2U(nb2listw(voisins4)))
+xtable(joincount.multi(Balanites,listw2U(nb2listw(voisins4))))
+#Jointcount_FZ4<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#localG()
+library(xtable)
+xtable(joincount.multi(Balanites,listw2U(nb2listw(voisins4))))
+
+
 #############1 avec le corrélogramme de SDMSelect
+
 
 library(gstat)
