@@ -2,6 +2,7 @@
 #Acacia nilotica
 Base_Espece$Acacia_nilotica<-as.factor(if_else(Base_Espece$Species =="Acacia nilotica","1","0"))
 #zone d'étude
+
 Base_Acacia_Z<-data_df %>%
   select(xcoord,ycoord,Acacia_nilotica)
 names(Base_Acacia_Z)<-c("lon","lat","Acacia")
