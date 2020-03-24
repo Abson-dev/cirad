@@ -192,11 +192,55 @@ Faidherbia <- Base_FZ1$Faidherbia
 #Création des listes de voisins et matrices de poids
 sp::coordinates(Base_FZ1) <-~lon+lat
 sp::proj4string(Base_FZ1) <-"+proj=longlat +datum=WGS84"
-Base_FZ1 <- spTransform (Base_FZ1, CRS ("+no_defs +ellps=WGS84 +towgs84=0,0,0
-+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0                                                            :2154") )
-menir75.nb<- knn2nb(knearneigh(Base_FZ1,k=2))
+voisins<- knn2nb(knearneigh(Base_FZ1,k=2))
+
 #Mise en oeuvre du test
-joincount.test(Faidherbia,listw2U(nb2listw(menir75.nb)))
+joincount.test(Faidherbia,listw2U(nb2listw(voisins)))
+print(joincount.multi(Faidherbia,listw2U(nb2listw(voisins))))
+Jointcount_FZ1<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(61.25,8.25,27.00),Esperance=c(56.6562,5.1562,34.6875),Variance=c(3.0378,1.4507,6.0339),z_value=c(2.6357,2.5686,-3.1296))
+#localG()
+###zone 3
+Base_FZ3<-Base_Faidherbia_Z3
+Base_FZ3$Faidherbia<-as.factor(Base_FZ3$Faidherbia)
+###conversion en facteur
+Faidherbia <- Base_FZ3$Faidherbia
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ3) <-~lon+lat
+sp::proj4string(Base_FZ3) <-"+proj=longlat +datum=WGS84"
+voisins3<- knn2nb(knearneigh(Base_FZ3,k=2))
+#Mise en oeuvre du test
+joincount.test(Faidherbia,listw2U(nb2listw(voisins3)))
+print(joincount.multi(Faidherbia,listw2U(nb2listw(voisins3))))
+Jointcount_FZ3<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#localG()
+###zone 2
+Base_FZ2<-Base_Faidherbia_Z2
+Base_FZ2$Faidherbia<-as.factor(Base_FZ2$Faidherbia)
+###conversion en facteur
+Faidherbia <- Base_FZ2$Faidherbia
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ2) <-~lon+lat
+sp::proj4string(Base_FZ2) <-"+proj=longlat +datum=WGS84"
+voisins2<- knn2nb(knearneigh(Base_FZ2,k=2))
+#Mise en oeuvre du test
+joincount.test(Faidherbia,listw2U(nb2listw(voisins2)))
+print(joincount.multi(Faidherbia,listw2U(nb2listw(voisins2))))
+Jointcount_FZ2<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(553.75,329.00,440.25),Esperance=c(441.647,235.647,645.706),Variance=c(50.698,42.594,134.574),z_value=c(15.744,14.304,-17.711))
+#localG()
+###zone 4
+Base_FZ4<-Base_Faidherbia_Z4
+Base_FZ4$Faidherbia<-as.factor(Base_FZ4$Faidherbia)
+###conversion en facteur
+Faidherbia <- Base_FZ4$Faidherbia
+#Création des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ4) <-~lon+lat
+sp::proj4string(Base_FZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_FZ4,k=5))
+#Mise en oeuvre du test
+joincount.test(Faidherbia,listw2U(nb2listw(voisins4)))
+print(joincount.multi(Faidherbia,listw2U(nb2listw(voisins4))))
+Jointcount_FZ4<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#localG()
 
 
 
