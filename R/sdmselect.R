@@ -24,20 +24,26 @@ plot(worldClim.crop,10:19)
 filename_zone<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones","\\Diohine_Echanti_Classif.shp")
 filename_zone
 zone_etude<-shapefile(filename_zone)
-plot(zone_etude)
-map<-st_as_sf(zone_etude)
+my.polygon<-zone_etude
+class(zone_etude)
+extent(zone_etude)<-extent(-16.54167,-16.35833,14.45833,14.63333)
+extent(worldClim.crop)
+my.polygon@bbox <- as.matrix(extent(worldClim.crop))
+extent(my.polygon)
+plot(my.polygon)
+map<-st_as_sf(my.polygon)
 map$Zone<-as.factor(map$Zone)
 ggplot(map)  + geom_sf(aes(fill=Zone),colour="green") + 
   theme_gray() + annotation_scale(location = "bl", width_hint = 0.3) +
   annotation_north_arrow(location = "bl", which_north = "true",
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
-                         style = north_arrow_fancy_orienteering)+
-  ggR(worldClim.crop, 1, stretch = "hist",hue=0.5,ggLayer = TRUE) +
+                         style = north_arrow_fancy_orienteering)
+ggplot(map) + geom_sf()+   ggR(worldClim.crop, 1, stretch = "hist",hue=0.5,geom_raster = T,ggLayer = TRUE) +
   scale_fill_gradientn(colours = terrain.colors(100)) 
   
 library(rasterVis)
 library(RStoolbox)
-ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "hist",hue=0.5) +
+ggR(worldClim.crop, 1, geom_raster=TRUE, stretch = "hist",hue=0.5,ggLayer = F) +
   scale_fill_gradientn(colours = terrain.colors(100), name = "elevation") +
   theme(axis.text = element_text(size=5), 
         axis.text.y = element_text(angle=90),
