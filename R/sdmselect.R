@@ -237,11 +237,12 @@ sp::coordinates(Base_FZ4) <-~lon+lat
 sp::proj4string(Base_FZ4) <-"+proj=longlat +datum=WGS84"
 voisins4<- knn2nb(knearneigh(Base_FZ4,k=5))
 #Mise en oeuvre du test
-joincount.test(Faidherbia,listw2U(nb2listw(voisins4)))
+xtable(joincount.test(Faidherbia,listw2U(nb2listw(voisins4))))
 print(joincount.multi(Faidherbia,listw2U(nb2listw(voisins4))))
-Jointcount_FZ4<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
+#Jointcount_FZ4<-data.frame(Liaison=c("Absence:Absence:","Présence:Présence","Présence:Absence"),Jointcount=c(598.25,437.50,488.25),Esperance=c(459.018,310.018,754.964),Variance=c(57.554,51.683,158.471),z_value=c(18.353,17.733,-21.187))
 #localG()
-
+library(xtable)
+xtable(joincount.multi(Faidherbia,listw2U(nb2listw(voisins4))))
 
 
 #############1 avec le corrélogramme de SDMSelect
