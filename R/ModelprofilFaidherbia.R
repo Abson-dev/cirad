@@ -57,3 +57,38 @@ plotPAZ1<-ggplot(map1)   +
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
                          style = north_arrow_fancy_orienteering)
 
+#Extraire un seul RasterLayer d'un RasterBrick (ou RasterStack).
+  #r <- raster(b, layer=2)
+###)connaitre l'étendue de notre zone d'étude (ext)
+ext<-raster::extent(Species)
+# class      : Extent 
+# xmin       : -16.53864 
+# xmax       : -16.35454 
+# ymin       : 14.45461 
+# ymax       : 14.63543 
+worlClim<-stack(l1)
+###)utiliser crop pour mettre a la même zone d'étude les données de worlclim
+worldClim.crop<-crop(worlClim,ext)
+r <- raster(worldClim.crop, layer=1)
+
+plot(r)
+plot(worldClim.crop)
+levelplot(r,contour=F)
+proj <- CRS('+proj=longlat +datum=WGS84')
+##Modify next line to your folder
+mapaSHP <- readShapeLines('C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp', proj4string=proj)
+mapaSHP@bbox <- as.matrix(extent(worldClim.crop))
+p <- levelplot(worldClim.crop, layers=1, margin = list(FUN = median))
+p + layer(sp.lines(mapaSHP, lwd=0.8, col='darkgray'))
+
+bounds <- list("sp.polygons", z1)
+spplot(r, sp.layout=bounds)
+
+values(r) <- 1:ncell(r)
+r <- mask(r, z1)
+plot(r)
+plot(z1)
+zone1<-z1$geometry
+plot(zone1)
+masked <- mask(x = r, mask = z1)
+plot(masked)
