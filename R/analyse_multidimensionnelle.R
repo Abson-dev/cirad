@@ -4,8 +4,9 @@ library(ade4)
 # res <- MCAshiny(tea)
 ##########Base de Faidherbia albida dans les zones avec les variables bioclimatiques
 #zone 1
-SDMdata_FZ1<-dataFZ1@data
-SDMdata_FZ1
+# SDMdata_FZ1<-dataFZ1@data
+# SDMdata_FZ1
+
 Faidherbia_pres<-Base_Faidherbia_Z %>%
   filter(Faidherbia==1)
 Faidherbia_pres<-Faidherbia_pres[,1:2]
@@ -44,6 +45,9 @@ tr<-threshold(evalFZ1,'spec_sens')
 pb<-predict(pred_nf,bcSDMdata_FZ1,ext=ext,progress='')
 pb
 par(mfrow=c(1,2))
+library(dismo)
+library(maptools)
+plot(pb)
 plot(pb,main='Bioclim,raw values')
 plot(zone_etude1,add=TRUE,border='dark grey')
 plot(pb>tr,main='presence/absence')
