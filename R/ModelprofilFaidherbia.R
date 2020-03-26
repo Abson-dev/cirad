@@ -69,19 +69,20 @@ ext<-raster::extent(Species)
 worlClim<-stack(l1)
 ###)utiliser crop pour mettre a la même zone d'étude les données de worlclim
 worldClim.crop<-crop(worlClim,ext)
-r <- raster(worldClim.crop, layer=1)
-
-plot(r)
-plot(worldClim.crop)
-levelplot(r,contour=F)
-bounds <- list("sp.polygons", z1)
-spplot(r, sp.layout=bounds)
-
+names(worldClim.crop)
+# [1] "bio1"  "bio10" "bio11" "bio12" "bio13" "bio14" "bio15" "bio16"
+# [9] "bio17" "bio18" "bio19" "bio2"  "bio3"  "bio4"  "bio5"  "bio6" 
+# [17] "bio7"  "bio8"  "bio9"
+bio1 <- raster(worldClim.crop, layer=1)
+levelplot(bio1,contour=F)
+# bounds <- list("sp.polygons", z1)
+# spplot(bio1, sp.layout=bounds)
+bio10 <- raster(worldClim.crop, layer=2)
+levelplot(bio10,contour=F)
 values(r) <- 1:ncell(r)
 r <- mask(r, z1)
 plot(r)
-plot(z1)
-zone1<-z1$geometry
-plot(zone1)
-masked <- mask(x = r, mask = z1)
-plot(masked)
+plot(z1, add=TRUE, lwd=1) 
+ggplot(map1)   +
+  geom_sf(data = z1, colour = "black", fill = NA)
+ggR(bio1,geom_raster=TRUE,stretch = "hist",hue=0.5,ggLayer = T)
