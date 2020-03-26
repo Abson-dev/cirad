@@ -86,3 +86,12 @@ plot(z1, add=TRUE, lwd=1)
 ggplot(map1)   +
   geom_sf(data = z1, colour = "black", fill = NA)
 ggR(bio1,geom_raster=TRUE,stretch = "hist",hue=0.5,ggLayer = T)
+
+ggR(bio1, geom_raster = TRUE,ggLayer = F) +
+  scale_fill_gradientn(name = "bio1", colours = terrain.colors(100))  +
+  theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+                         style = north_arrow_fancy_orienteering) +
+  geom_sf(data = z1, colour = "black", fill = NA)
+  
