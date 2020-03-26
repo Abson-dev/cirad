@@ -14,10 +14,11 @@ Base_Espece$Faidherbia_albida<-as.factor(Base_Espece$Faidherbia_albida)
 l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 ###2) utiliser la fonction stack pour rendre RasterStack
-worlClim<-stack(l1)
+worlClim<-raster::stack(l1)
 ###3)connaitre l'étendue de notre zone d'étude (ext)
-ext<-extent(Species)
+ext<-raster::extent(Species)
 ###4)utiliser crop pour mettre a la même zone d'étude les données de worlclim
+library(raster)
 worldClim.crop<-crop(worlClim,ext)
 plot(worldClim.crop,1:9)
 plot(worldClim.crop,10:19)
@@ -88,6 +89,10 @@ names(Base_Faidherbia_Z4)<-c("lon","lat","Faidherbia")
 FZ4<-Base_Faidherbia_Z4
 ##################fin zones
 #Transform data as SpatialPointDataFrame
+##zone d'étude
+FZ<-Base_Faidherbia_Z
+sp::coordinates(FZ) <-~lon+lat
+sp::proj4string(FZ) <-"+proj=longlat +datum=WGS84"
 ###zone 1
 sp::coordinates(FZ1) <-~lon+lat
 sp::proj4string(FZ1) <-"+proj=longlat +datum=WGS84"
@@ -102,6 +107,9 @@ sp::coordinates(FZ4) <-~lon+lat
 sp::proj4string(FZ4) <-"+proj=longlat +datum=WGS84"
 ##############"fin zones
 #extract covariables, combine with dataset 
+
+dataFZ<-SDMSelect::CovarExtract(x=FZ,cov.paths = l1)
+dataFaidZ<-dataFZ@data
 ###zone 1
 dataFZ1<-CovarExtract(x=FZ1,cov.paths = l1) # en utilsisant SDMSelect
 ###zone 2
