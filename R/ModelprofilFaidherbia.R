@@ -37,6 +37,12 @@ sp::proj4string(FZ1) <-"+proj=longlat +datum=WGS84"
 l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 dataFZ1<-CovarExtract(x=FZ1,cov.paths = l1) # en utilsisant SDMSelect
+DataModelFZ1<-dataFZ1@data
+View(DataModelFZ1)
+table(DataModelFZ1$Faidherbia)
+
+
+
 ############## exporter dataFZ1 en .shp
 tmpdir<-"C:\\Users\\Hp\\Desktop\\Model"
 ##zone 1
@@ -93,7 +99,7 @@ ggR(bio1, geom_raster = TRUE,ggLayer = F) +
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
                          style = north_arrow_fancy_orienteering)  +
   geom_sf(data = z1, colour = "blue", fill = NA)
-
+#en tenant compte du mask
 # ggR(r, geom_raster = TRUE,ggLayer = F) +
 #   scale_fill_gradientn(name = "bio1", colours = terrain.colors(100))  +
 #   theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
@@ -101,4 +107,19 @@ ggR(bio1, geom_raster = TRUE,ggLayer = F) +
 #                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
 #                          style = north_arrow_fancy_orienteering)  +
 #   geom_sf(data = z1, colour = "blue", fill = NA)
-  
+ 
+##################Modélisation
+#Examinons d'abord un modèle d'arbres de classification et de régression (CART).
+library(rpart)
+cart <- rpart(Faidherbia~., data=DataModelFZ1)
+printcp(cart)
+plotcp(cart)
+plot(cart, uniform=TRUE, main="Regression Tree")
+# text(cart, use.n=TRUE, all=TRUE, cex=.8)
+text(cart, cex=.8, digits=1)
+library(randomForest)
+fpa <- as.factor(DataModelFZ1[, 'Faidherbia'])
+crf <- randomForest(DataModelFZ1[, 2:ncol(DataModelFZ1)], fpa)
+crf
+plot(crf)
+varImpPlot(crf)
