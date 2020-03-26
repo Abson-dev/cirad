@@ -79,14 +79,12 @@ levelplot(bio1,contour=F)
 # spplot(bio1, sp.layout=bounds)
 bio10 <- raster(worldClim.crop, layer=2)
 levelplot(bio10,contour=F)
-r <- raster(worldClim.crop, layer=1)
-values(r) <- 1:ncell(r)
-r <- mask(r, z1)
-plot(r)
-plot(z1, add=TRUE, lwd=1) 
-ggplot(map1)   +
-  geom_sf(data = z1, colour = "black", fill = NA)
-ggR(bio1,geom_raster=TRUE,stretch = "hist",hue=0.5,ggLayer = T)
+# r <- raster(worldClim.crop, layer=1)
+# values(r) <- 1:ncell(r)
+# r <- mask(r, z1)
+# plot(r)
+# plot(z1, add=TRUE, lwd=1) 
+
 
 ggR(bio1, geom_raster = TRUE,ggLayer = F) +
   scale_fill_gradientn(name = "bio1", colours = terrain.colors(100))  +
