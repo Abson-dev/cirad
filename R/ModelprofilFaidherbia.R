@@ -79,6 +79,7 @@ levelplot(bio1,contour=F)
 # spplot(bio1, sp.layout=bounds)
 bio10 <- raster(worldClim.crop, layer=2)
 levelplot(bio10,contour=F)
+r <- raster(worldClim.crop, layer=1)
 values(r) <- 1:ncell(r)
 r <- mask(r, z1)
 plot(r)
@@ -92,6 +93,14 @@ ggR(bio1, geom_raster = TRUE,ggLayer = F) +
   theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
   annotation_north_arrow(location = "bl", which_north = "true",
                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
-                         style = north_arrow_fancy_orienteering) +
-  geom_sf(data = z1, colour = "black", fill = NA)
+                         style = north_arrow_fancy_orienteering)  +
+  geom_sf(data = z1, colour = "blue", fill = NA)
+
+# ggR(r, geom_raster = TRUE,ggLayer = F) +
+#   scale_fill_gradientn(name = "bio1", colours = terrain.colors(100))  +
+#   theme_bw() + annotation_scale(location = "bl", width_hint = 0.3) +
+#   annotation_north_arrow(location = "bl", which_north = "true",
+#                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+#                          style = north_arrow_fancy_orienteering)  +
+#   geom_sf(data = z1, colour = "blue", fill = NA)
   
