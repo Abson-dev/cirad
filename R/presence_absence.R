@@ -13,6 +13,7 @@ Base_Espece$Anogeissus_leiocarpus<-if_else(Base_Espece$Species =="Anogeissus lei
 Base_Espece$Adansonia_digitata<-if_else(Base_Espece$Species =="Adansonia digitata","1","0")
 #Acacia nilotica
 Base_Espece$Acacia_nilotica<-if_else(Base_Espece$Species =="Acacia nilotica","1","0")
+library(sf)
 Base_Espece_df<-st_drop_geometry(Base_Espece)
 install.packages("funModeling")
 library(funModeling)
