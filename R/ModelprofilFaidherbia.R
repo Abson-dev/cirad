@@ -74,13 +74,6 @@ r <- raster(worldClim.crop, layer=1)
 plot(r)
 plot(worldClim.crop)
 levelplot(r,contour=F)
-proj <- CRS('+proj=longlat +datum=WGS84')
-##Modify next line to your folder
-mapaSHP <- readShapeLines('C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp', proj4string=proj)
-mapaSHP@bbox <- as.matrix(extent(worldClim.crop))
-p <- levelplot(worldClim.crop, layers=1, margin = list(FUN = median))
-p + layer(sp.lines(mapaSHP, lwd=0.8, col='darkgray'))
-
 bounds <- list("sp.polygons", z1)
 spplot(r, sp.layout=bounds)
 
