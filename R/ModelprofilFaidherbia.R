@@ -1,5 +1,6 @@
 ########"Modélisation de Faidherbia albida dans la zone 1
 ##zone 1
+library(tidyverse)
 library(SDMSelect)
 library(dplyr)
 library(sf)
@@ -27,8 +28,7 @@ data_df<-st_drop_geometry(Base_Espece)
 ##########???les espèces dans les différentes zones
 Base_Espece_Zone1<-data_df %>%
   filter(Zone == 1)
-Base_Faidherbia_Z1<-Base_Espece_Zone1 %>%
-  select(xcoord,ycoord,Faidherbia_albida)
+Base_Faidherbia_Z1<-Base_Espece_Zone1[,c("xcoord","ycoord","Faidherbia_albida")] 
 names(Base_Faidherbia_Z1)<-c("lon","lat","Faidherbia")
 FZ1<-Base_Faidherbia_Z1
 #Transform data as SpatialPointDataFrame
@@ -82,7 +82,12 @@ names(worldClim.crop)
 # [9] "bio17" "bio18" "bio19" "bio2"  "bio3"  "bio4"  "bio5"  "bio6" 
 # [17] "bio7"  "bio8"  "bio9"
 bio1 <- raster(worldClim.crop, layer=1)
-levelplot(bio1,contour=F)
+levelplot(output,contour=F)
+raster<-bio1  
+buffer<-zone_etude1 #yellow buffer
+
+output<-mask(raster, buffer)
+plot(output)
 # bounds <- list("sp.polygons", z1)
 # spplot(bio1, sp.layout=bounds)
 bio10 <- raster(worldClim.crop, layer=2)
