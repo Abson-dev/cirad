@@ -84,7 +84,7 @@ names(worldClim.crop)
 bio1 <- raster(worldClim.crop, layer=1)
 levelplot(output,contour=F)
 raster<-bio1  
-buffer<-zone_etude1 #yellow buffer
+buffer<-z1$geometry #yellow buffer
 
 output<-mask(raster, buffer)
 plot(output)
@@ -95,8 +95,8 @@ levelplot(bio10,contour=F)
 # r <- raster(worldClim.crop, layer=1)
 # values(r) <- 1:ncell(r)
 # r <- mask(r, z1)
-# plot(r)
-# plot(z1, add=TRUE, lwd=1) 
+ plot(output)
+ plot(z1$geometry, add=TRUE, lwd=1) 
 
 
 ggR(bio1, geom_raster = TRUE,ggLayer = F) +
