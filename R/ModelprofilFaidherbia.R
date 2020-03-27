@@ -11,6 +11,7 @@ library(rgdal)
 library(spdep)
 library(ggplot2)
 library(ggspatial)
+library(blockCV)
 library(randomForest)
 #############"
 zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp")
@@ -108,7 +109,30 @@ ggR(bio1, geom_raster = TRUE,ggLayer = F) +
 #                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
 #                          style = north_arrow_fancy_orienteering)  +
 #   geom_sf(data = z1, colour = "blue", fill = NA)
- 
+if(interactive()){
+  # load package data
+  awt <- bio1
+  # import presence-absence species data
+  PA <- Base_Faidherbia_Z1
+  # make a sf object from data.frame
+  pa_data <- sf::st_as_sf(PA, coords = c("lon", "lat"), crs = raster::crs(awt))
+  rangeExplorer(rasterLayer = awt) # the only mandatory input
+  # add species data to add them on the map
+  rangeExplorer(rasterLayer = awt,
+                speciesData = pa_data,
+                species = "Faidherbia",
+                rangeTable = NULL,
+                minRange = 30000, # limit the search domain
+                maxRange = 100000)
+}
+sb2 <- spatialBlock(speciesData = pa_data,
+                    species = "Faidherbia",
+                    rasterLayer = awt,
+                    rows = 5,
+                    cols = 8,
+                    k = 5,
+                    selection = "systematic",
+                    biomod2Format = TRUE)
 ##################Modélisation
 #Examinons d'abord un modèle d'arbres de classification et de régression (CART).
 # library(rpart)
