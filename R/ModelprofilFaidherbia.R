@@ -11,6 +11,7 @@ library(rgdal)
 library(spdep)
 library(ggplot2)
 library(ggspatial)
+library(randomForest)
 #############"
 zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp")
 z1<-st_as_sf(zone_etude1)
@@ -110,16 +111,56 @@ ggR(bio1, geom_raster = TRUE,ggLayer = F) +
  
 ##################Modélisation
 #Examinons d'abord un modèle d'arbres de classification et de régression (CART).
-library(rpart)
-cart <- rpart(Faidherbia~., data=DataModelFZ1)
-printcp(cart)
-plotcp(cart)
-plot(cart, uniform=TRUE, main="Regression Tree")
-# text(cart, use.n=TRUE, all=TRUE, cex=.8)
-text(cart, cex=.8, digits=1)
-library(randomForest)
+# library(rpart)
+# cart <- rpart(Faidherbia~., data=DataModelFZ1)
+# printcp(cart)
+# plotcp(cart)
+# plot(cart, uniform=TRUE, main="Regression Tree")
+# # text(cart, use.n=TRUE, all=TRUE, cex=.8)
+# text(cart, cex=.8, digits=1)
+
 fpa <- as.factor(DataModelFZ1[, 'Faidherbia'])
 crf <- randomForest(DataModelFZ1[, 2:ncol(DataModelFZ1)], fpa)
 crf
+class(crf)
 plot(crf)
 varImpPlot(crf)
+#bio4,bio2,bio3,bio18,bio15,bio10,bio11,bio1
+######################constitution des données d'entrainement et test
+Faidherbia_pres<-Base_Faidherbia_Z1 %>%
+  filter(Faidherbia==1)
+Faidherbia_pres<-Faidherbia_pres[,1:2]
+presvals<-extract(predictors,Faidherbia_pres)
+Faidherbia_abs<-Base_Faidherbia_Z %>%
+  filter(Faidherbia==0)
+Faidherbia_abs<-Faidherbia_abs[,1:2]
+corela<-corrr::correlate(DataModelFZ1[,2:20])
+
+set.seed(0)
+group<-kfold(Faidherbia_pres,5)
+Faidherbia_pres_train<-Faidherbia_pres[group!=1,]
+dim(Faidherbia_pres_train)
+Faidherbia_pres_test<-Faidherbia_pres[group==1,]
+dim(Faidherbia_pres_test)
+
+ext<-extent(-16.53864,-16.35454,14.45461,14.63543)
+# class      : Extent 
+# xmin       : -16.53864 
+# xmax       : -16.35454 
+# ymin       : 14.45461 
+# ymax       : 14.63543 
+set.seed(0)
+pred_nf<-predictors
+
+backg<-Faidherbia_abs
+colnames(backg)=c("lon","lat")
+group<-kfold(backg,5)
+backg_train<-backg[group!=1,]
+backg_test<-backg[group==1,]
+
+#######*logistic regression
+gm1<-glm(Faidherbia ~bio4 + bio2 + bio9 + bio18 + bio15 + bio10 + bio11 + bio1 + bio16 + bio8, family = binomial(link = "logit"),data = DataModelFZ1)
+xtabs(gm1)
+summary(gm1)
+###################
+maxent()
