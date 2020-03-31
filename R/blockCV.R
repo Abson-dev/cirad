@@ -100,16 +100,18 @@ plot(awt)
 range1 <- spatialAutoRange(rasterLayer = awt,
                            sampleNumber = 5000, # number of cells to be used
                            doParallel = TRUE,
-                           nCores = 2, # if NULL, it uses half of the CPU cores
+                           nCores = NULL, # if NULL, it uses half of the CPU cores
                            plotVariograms = TRUE,
                            showPlots = TRUE)
 # run the model with no parallel
 range3 <- spatialAutoRange(rasterLayer = awt,
                            sampleNumber = 5000,
                            doParallel = FALSE,
+                           plotVariograms = TRUE,
+                           showPlots = TRUE,
                            progress = TRUE)
 # show the result
-summary(range1)
+summary(range3)
 ##
 # load package data
 library(sf)
