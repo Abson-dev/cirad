@@ -64,15 +64,12 @@ pa_data <- sf::st_as_sf(PA, coords = c("lon", "lat"), crs = raster::crs(awt))
 set.seed(1994)
 sb1 <- spatialBlock(speciesData = pa_data,
                     species = "Faidherbia",
-                    
-                    theRange = 20502,
-                    k = 2,
+                    rasterLayer = awt,
+                    rows = 5,
+                    cols = 8,
+                    k = 5,
                     selection = "random",
-                    iteration = 100,
-                    numLimit = NULL,
-                    biomod2Format = TRUE,
-                    xOffset = 0.3, # shift the blocks horizontally
-                    yOffset = 0)
+                    biomod2Format = TRUE)
 foldExplorer(sb1, awt, pa_data)
 sb2 <- spatialBlock(speciesData = pa_data,
                     species = "Faidherbia",
@@ -83,7 +80,14 @@ sb2 <- spatialBlock(speciesData = pa_data,
                     selection = "systematic",
                     biomod2Format = TRUE)
 foldExplorer(sb2, awt, pa_data)
-
-
+sb3 <- spatialBlock(speciesData = pa_data,
+                    species = "Faidherbia",
+                    rasterLayer = awt,
+                    rows = 5,
+                    cols = 8,
+                    k = 5,
+                    selection = "checkerboard",
+                    biomod2Format = TRUE)
+foldExplorer(sb3, awt, pa_data)
 
 
