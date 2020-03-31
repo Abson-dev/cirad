@@ -73,7 +73,7 @@ if(interactive()){
                  speciesData = pa_data,
                  species = "Species",
                  k = 5)
-  foldExplorer(eb, awt, pa_data)
+  foldExplorer(sb1, awt, pa_data)
 }
 if(interactive()){
   # load package data
@@ -101,7 +101,7 @@ range1 <- spatialAutoRange(rasterLayer = awt,
                            sampleNumber = 5000, # number of cells to be used
                            doParallel = TRUE,
                            nCores = 2, # if NULL, it uses half of the CPU cores
-                           plotVariograms = FALSE,
+                           plotVariograms = TRUE,
                            showPlots = TRUE)
 # run the model with no parallel
 range3 <- spatialAutoRange(rasterLayer = awt,
@@ -120,8 +120,8 @@ PA <- read.csv(system.file("extdata", "PA.csv", package = "blockCV"))
 pa_data <- sf::st_as_sf(PA, coords = c("x", "y"), crs = raster::crs(awt))
 # spatial blocking by specified range and random assignment
 sb1 <- spatialBlock(speciesData = pa_data,
-                    species = "Species",
-                    theRange = 70000,
+                    species = "Faidherbia",
+                    theRange = 10,
                     k = 5,
                     selection = "random",
                     iteration = 100,
@@ -156,8 +156,8 @@ sb2 <- spatialBlock(speciesData = pa_data,
 
 # spatial blocking by specified range and random assignment
 sb <- spatialBlock(speciesData = pa_data, # sf or SpatialPoints
-                   species = "Species", # the response column (binomial or multi-class)
-                   rasterLayer = myrasters, # a raster for backgoround (optional)
+                   species = "Faidherbia", # the response column (binomial or multi-class)
+                   rasterLayer = bio1, # a raster for backgoround (optional)
                    theRange = 70000, # size of the blocks
                    k = 5, # the number of folds
                    selection = "random",
@@ -166,7 +166,7 @@ sb <- spatialBlock(speciesData = pa_data, # sf or SpatialPoints
 
 # investigate spatial autocorrelation in raster covariates
 # this helps to choose a suitable size for spatial blocks
-spatialAutoRange(rasterLayer = myrasters, # raster file
+spatialAutoRange(rasterLayer = bio1, # raster file
                  sampleNumber = 5000, # number of cells to be used
                  doParallel = TRUE,
                  showPlots = TRUE)
@@ -177,3 +177,28 @@ rangeExplorer(rasterLayer = myrasters,
               species = "Species" # the responcse column (optional)
               minRange = 30000, # limit the search domain
               maxRange = 100000)
+
+if(interactive()){
+  # load package data
+  awt <- bio1
+  # import presence-absence species data
+  PA <- Base_Faidherbia_Z2
+  # make a sf object from data.frame
+  pa_data <- sf::st_as_sf(PA, coords = c("lon", "lat"), crs = raster::crs(awt))
+  rangeExplorer(rasterLayer = awt) # the only mandatory input
+  # add species data to add them on the map
+  rangeExplorer(rasterLayer = awt,
+                speciesData = pa_data,
+                species = "Faidherbia",
+                rangeTable = NULL,
+                minRange = 30000, # limit the search domain
+                maxRange = 100000)
+}
+sb2 <- spatialBlock(speciesData = pa_data,
+                    species = "Faidherbia",
+                    rasterLayer = awt,
+                    rows = 5,
+                    cols = 8,
+                    k = 5,
+                    selection = "systematic",
+                    biomod2Format = TRUE)
