@@ -14,11 +14,13 @@ library(ggplot2)
 library(ggspatial)
 library(blockCV)
 library(randomForest)
+library(rJava)
+library(dismo)
 #############"
 zone_etude1<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_1_BON.shp")
 z1<-st_as_sf(zone_etude1)
 #########
-filename<-paste0("D:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+filename<-paste0("E:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
 Base_Espece<-Species
 Base_Espece$Faidherbia_albida<-if_else(Base_Espece$Species =="Faidherbia albida","1","0")
@@ -114,12 +116,12 @@ bio5 <- raster(worldClim.crop, layer=15)
 writeRaster(bio5, filename=file.path(tmpdir, "bio5.tif"), format="GTiff", overwrite=TRUE)
 bio6 <- raster(worldClim.crop, layer=16)
 writeRaster(bio6, filename=file.path(tmpdir, "bio6.tif"), format="GTiff", overwrite=TRUE)
-bio4 <- raster(worldClim.crop, layer=14)
-writeRaster(bio4, filename=file.path(tmpdir, "bio4.tif"), format="GTiff", overwrite=TRUE)
-bio5 <- raster(worldClim.crop, layer=15)
-writeRaster(bio5, filename=file.path(tmpdir, "bio5.tif"), format="GTiff", overwrite=TRUE)
-bio6 <- raster(worldClim.crop, layer=16)
-writeRaster(bio6, filename=file.path(tmpdir, "bio6.tif"), format="GTiff", overwrite=TRUE)
+bio7 <- raster(worldClim.crop, layer=17)
+writeRaster(bio7, filename=file.path(tmpdir, "bio7.tif"), format="GTiff", overwrite=TRUE)
+bio8 <- raster(worldClim.crop, layer=18)
+writeRaster(bio8, filename=file.path(tmpdir, "bio8.tif"), format="GTiff", overwrite=TRUE)
+bio9 <- raster(worldClim.crop, layer=19)
+writeRaster(bio9, filename=file.path(tmpdir, "bio9.tif"), format="GTiff", overwrite=TRUE)
 levelplot(output,contour=F)
 raster<-bio1  
 # buffer<-z1$geometry #yellow buffer
@@ -152,30 +154,7 @@ ggR(bio1, geom_raster = TRUE,ggLayer = F) +
 #                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
 #                          style = north_arrow_fancy_orienteering)  +
 #   geom_sf(data = z1, colour = "blue", fill = NA)
-if(interactive()){
-  # load package data
-  awt <- bio1
-  # import presence-absence species data
-  PA <- Base_Faidherbia_Z1
-  # make a sf object from data.frame
-  pa_data <- sf::st_as_sf(PA, coords = c("lon", "lat"), crs = raster::crs(awt))
-  rangeExplorer(rasterLayer = awt) # the only mandatory input
-  # add species data to add them on the map
-  rangeExplorer(rasterLayer = awt,
-                speciesData = pa_data,
-                species = "Faidherbia",
-                rangeTable = NULL,
-                minRange = 30000, # limit the search domain
-                maxRange = 100000)
-}
-sb2 <- spatialBlock(speciesData = pa_data,
-                    species = "Faidherbia",
-                    rasterLayer = awt,
-                    rows = 5,
-                    cols = 8,
-                    k = 5,
-                    selection = "systematic",
-                    biomod2Format = TRUE)
+
 ##################Modélisation
 #Examinons d'abord un modèle d'arbres de classification et de régression (CART).
 # library(rpart)
@@ -231,3 +210,4 @@ xtabs(gm1)
 summary(gm1)
 ###################
 maxent()
+###############################Modélisation dans la zone 2
