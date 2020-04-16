@@ -71,6 +71,9 @@ sb1 <- spatialBlock(speciesData = pa_data,
                     selection = "random",
                     biomod2Format = TRUE)
 foldExplorer(sb1, awt, pa_data)
+biomodTable<-sb1$biomodTable
+records<-sb1$records
+folds<-sb1$folds
 sb2 <- spatialBlock(speciesData = pa_data,
                     species = "Faidherbia",
                     rasterLayer = awt,
@@ -89,5 +92,5 @@ sb3 <- spatialBlock(speciesData = pa_data,
                     selection = "checkerboard",
                     biomod2Format = TRUE)
 foldExplorer(sb3, awt, pa_data)
-
+         
 
