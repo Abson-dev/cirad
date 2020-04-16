@@ -11,8 +11,8 @@ Base_Espece$Faidherbia_albida<-as.factor(Base_Espece$Faidherbia_albida)
 #################################################
 ########???importation des données de worldclim
 ###1)prendre les fichiers .tif(raster) qui se trouvent dans le dossier indiquer
-l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
-l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+l1<-list.files("F:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("F:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 ###2) utiliser la fonction stack pour rendre RasterStack
 worlClim<-raster::stack(l1)
 ###3)connaitre l'étendue de notre zone d'étude (ext)
