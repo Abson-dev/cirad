@@ -1,26 +1,8 @@
 ########"Modélisation de Faidherbia albida dans la zone 1
 ##zone 1
-library(tidyverse)
-library(SDMSelect)
-library(dplyr)
-library(sf)
-library(raster)
-library(rasterVis)
-library(RStoolbox)
-library(maptools)
-library(rgdal)
-library(spdep)
-library(ggplot2)
-library(ggspatial)
-library(blockCV)
-library(randomForest)
-library(rJava)
-library(dismo)
-#############"
-zone_etude2<-shapefile("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\Zone_2_BON.shp")
-z2<-st_as_sf(zone_etude2)
+
 #########
-filename<-paste0("D:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+filename<-paste0("F:\\Stage_SDM\\SDM\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
 Base_Espece<-Species
 Base_Espece$Faidherbia_albida<-if_else(Base_Espece$Species =="Faidherbia albida","1","0")
@@ -38,8 +20,8 @@ sp::coordinates(FZ2) <-~lon+lat
 sp::proj4string(FZ2) <-"+proj=longlat +datum=WGS84"
 ########???importation des données de worldclim
 ###1)prendre les fichiers .tif(raster) qui se trouvent dans le dossier indiquer
-l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
-l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+l1<-list.files("F:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("F:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 dataFZ2<-CovarExtract(x=FZ2,cov.paths = l1) # en utilsisant SDMSelect
 DataModelFZ2<-dataFZ2@data
 View(DataModelFZ2)
