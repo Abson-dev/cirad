@@ -153,7 +153,7 @@ arbre_zone<-ggplot(data = data_pie, mapping = aes(x = factor(1), y = values, fil
                 y = values/2 + c(0, cumsum(values)[-length(values)]), 
                 label=paste(Zones,"\n",values*100, "%")), family = "Consolas") +
   theme(axis.title.x = element_blank(),axis.title.y = element_blank())
-
+library(ggplot2)
 #enlévé le polar
 ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\arbre_zone.png",arbre_zone)
 ######################################
