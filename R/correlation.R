@@ -18,9 +18,23 @@ Cor<-DataModelFZ[,c(-1,-7,-12)]
 library(ggcorrplot)
 # Compute a correlation matrix
 #data(mtcars)
-corr <- round(cor(Cor),1)
-head(corr[, 1:6])
-
+corr <- round(cor(Cor),3)
+corela<-ggcorrplot(corr,ggtheme = ggplot2::theme_gray,
+                   hc.order = TRUE,
+                   type = "lower",
+                   lab = TRUE,
+                   colors = c("#6D9EC1", "white", "#E46726")) +
+  ggtitle("(a)") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+p.mat <- cor_pmat(Cor)
+sign<-ggcorrplot(corr,ggtheme = ggplot2::theme_gray,
+                 hc.order = TRUE,
+                 type = "lower",
+                 p.mat = p.mat,
+                 colors = c("#6D9EC1", "white", "#E46726")) +
+  ggtitle("(b)") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+Biocorr<-ggarrange(corela,sign,
+                        common.legend = TRUE)
+ggexport(soilgridcorr,filename ="soilgridcorr.png",width = 948, height = 480)
 # Compute a matrix of correlation p-values
 p.mat <- cor_pmat(Cor)
 head(p.mat[, 1:4])

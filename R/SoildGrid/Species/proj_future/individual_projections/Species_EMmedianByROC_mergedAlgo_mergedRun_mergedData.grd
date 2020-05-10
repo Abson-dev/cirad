@@ -1,0 +1,26 @@
+[general]
+creator=R package 'raster'
+created=2020-04-23 05:14:25
+[georeference]
+nrows=610
+ncols=306
+xmin=254015.825161
+ymin=7821167.848281
+xmax=498815.825161
+ymax=8309167.848281
+projection=+proj=utm +zone=55 +south +ellps=GRS80 +units=m +no_defs
+[data]
+datatype=FLT4S
+byteorder=little
+nbands=1
+bandorder=BIL
+categorical=FALSE
+minvalue=20
+maxvalue=964
+nodatavalue=-3.4e+38
+[legend]
+legendtype=
+values=
+color=
+[description]
+layername=layer

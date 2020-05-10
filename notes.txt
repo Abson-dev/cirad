@@ -1,0 +1,26 @@
+Introduction
+Chap1 Révue de littérature
+1 les parcs agroforestiers du sénégal
+1.1 les espèces ligneuses des parcs à F al
+1.2 à C p
+
+2 les SDM
+sdm de manière générale
+présentation de chaq modèle en 2.1 et etc
+Chap2 Matériels
+1 zone d'étude
+2 présentation des données
+2.1 données observées
+  cartographie du gradient
+2.2 données spatialisées
+ warpor, bioclim, phénologie, sol
+
+chap3 Méthodes
+
+chap4 Résultats et discussions
+
+Conclusion
+
+##########
+1 caractéristiques des espèces ligneuses à F al, et
+ 2 cordila p

@@ -14,15 +14,25 @@ library(blockCV)
 library(randomForest)
 library(rJava)
 library(dismo)
+rm(list = ls()) #Effacement de toutes les données en mémoire
+graphics.off() #Effacement de tous les graphiques en mémoire
 # import raster data
 l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 worldclim<-stack(l1)
-awt1 <- crop(worldclim,extent(Species))
-awt1<-stack(awt1)
+
 # import presence-absence species data
 filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
+worldclim.crop <- crop(worldclim,extent(Species))
+bio1 <- raster(worldclim.crop, layer=1)
+bio18 <- raster(worldclim.crop, layer=10)
+bio3 <- raster(worldclim.crop, layer=13)
+bio13 <- raster(worldclim.crop, layer=5)
+bio16 <- raster(worldclim.crop, layer=8)
+bio12 <- raster(worldclim.crop, layer=4)
+awt<-stack(bio1,bio18,bio13,bio16,bio3,bio12)
+
 Base_Espece<-Species
 Base_Espece$Faidherbia_albida<-if_else(Base_Espece$Species =="Faidherbia albida","1","0")
 Base_Espece$Faidherbia_albida<-as.factor(Base_Espece$Faidherbia_albida)
@@ -41,7 +51,7 @@ pa_data <- sf::st_as_sf(PA, coords = c("lon", "lat"), crs = raster::crs(awt))
 
 # investigate spatial autocorrelation in raster covariates
 # this helps to choose a suitable size for spatial blocks
-range<-spatialAutoRange(rasterLayer = awt1, # raster file
+range<-spatialAutoRange(rasterLayer = awt, # raster file
                         doParallel = F,
                         sampleNumber = 462, # number of cells to be used
                         
@@ -54,16 +64,28 @@ plot(range$variograms[[1]])
 
 # spatial blocking by specified range and random assignment
 set.seed(1994)
-sb1 <- spatialBlock(speciesData = pa_data,
+sb <- spatialBlock(speciesData = pa_data,
+                   species = "Faidherbia",
+                   rasterLayer = awt,
+                   theRange = 1, # size of the blocks
+                   k = 5,
+                   selection = "random",
+                   iteration = 100, # find evenly dispersed folds
+                   biomod2Format = TRUE,
+                   xOffset = 0, # shift the blocks horizontally
+                   yOffset = 0)
+
+
+sb2 <- spatialBlock(speciesData = pa_data, # presence-background data
                     species = "Faidherbia",
-                    rasterLayer = awt1,
-                    rows = 10,
-                    cols = 10,
+                    rasterLayer = awt,
+                    rows = 5,
+                    cols = 6,
                     k = 5,
-                    selection = "random",
+                    selection = "systematic",
                     biomod2Format = TRUE)
 foldExplorer(sb1, awt, pa_data)
-sb1$plots + geom_sf(data = pa_data, alpha = 0.5)
+sb2$plots + geom_sf(data = pa_data, alpha = 0.5)
 
 library(maxnet)
 library(precrec)
@@ -105,8 +127,12 @@ DataModelF<-dataF@data
 
   # species occurrences
   Data<-data_df[,c("xcoord","ycoord","Faidherbia_albida")] 
+  dim(Data)
   names(Data)<-c("lon","lat","Faidherbia")
-   DataSpecies <- Data
+   # DataSpecies <- Data %>%
+   #               slice(1:9253)
+  DataSpecies <- Data
+   dim(DataSpecies)
   #  # the name of studied species
     myRespName <- "Faidherbia"
     # the presence/absences data for our species
@@ -118,27 +144,31 @@ DataModelF<-dataF@data
   #
   #  # 1. Formatting Data
     library(biomod2)
-    myBiomodData <- BIOMOD_FormatingData(resp.var = myResp,
-                                        expl.var = awt1, # explanatory raster data
+    myBiomodData2 <- BIOMOD_FormatingData(resp.var = myResp,
+                                        expl.var = awt, # explanatory raster data
                                         resp.xy = myRespXY,
                                         resp.name = myRespName,
                                         na.rm = TRUE)
-  #
+  plot(myBiomodData2)
+    #
   #  # 2. Defining the folds for DataSplitTable
   #  # note that biomodTable should be used here not folds
-    DataSplitTable <- sb1$biomodTable # use generated folds from spatialBlock in previous section
-    
+    DataSplitTable <- sb2$biomodTable # use generated folds from spatialBlock in previous section
+    length(dim(DataSplitTable))
+    dim(DataSplitTable)[1]
+    dim(DataSplitTable)[2]
+    length(DataSpecies)
   #  # 3. Defining Models Options using default options.
     myBiomodOption <- BIOMOD_ModelingOptions()
   #
   #  # 4. Model fitting
-    myBiomodModelOut <- BIOMOD_Modeling( myBiomodData,
-                                         models = c('GLM','MARS','GBM'),
+    myBiomodModelOut2 <- BIOMOD_Modeling( myBiomodData2,
+                                         models = c('GLM','RF'),
                                          models.options = myBiomodOption,
                                          DataSplitTable = DataSplitTable, # blocking folds
                                         VarImport = 0,
                                         models.eval.meth = c('ROC'),
-                                      do.full.models=FALSE,
+                                      
                                       modeling.id="test")
   #
 
@@ -172,10 +202,10 @@ DataModelF<-dataF@data
     ##' 2. Defining Models Options using default options.
     myBiomodOption <- BIOMOD_ModelingOptions()    
     ##' 3. Doing Modelisation
-    myBiomodModelOut <- BIOMOD_Modeling( myBiomodData,
-                                         models = c('CTA','RF','GLM','GAM'),
+    myBiomodModelOut <- BIOMOD_Modeling( myBiomodData2,
+                                         models = c('RF','GLM','GAM'),
                                          models.options = myBiomodOption,
-                                         NbRunEval=5,
+                                         NbRunEval=1,
                                          DataSplit=70,
                                          models.eval.meth = c('ROC','TSS'),
                                          do.full.models = FALSE,
@@ -184,8 +214,46 @@ DataModelF<-dataF@data
      ######get output
     # get_predictions
     # get_calib_lines
-     get_evaluations(myBiomodModelOut)
+    # get all models evaluation
+    myBiomodModelEval <- get_evaluations(myBiomodModelOut)
+    class(myBiomodModelEval)
+    dim(myBiomodModelEval)
+    ev.ROC.Testing.data<-as.data.frame(myBiomodModelEval["ROC","Testing.data",,,])
+    xtable(ev.ROC.Testing.data)
+    ev.TSS.Testing.data<-as.data.frame(myBiomodModelEval["TSS","Testing.data",,,])
+    xtable(ev.TSS.Testing.data)
+    ev.ROC.Sensitivity<-as.data.frame(myBiomodModelEval["ROC","Sensitivity",,,])
+    xtable(ev.ROC.Sensitivity)
+    ev.TSS.Sensitivity<-as.data.frame(myBiomodModelEval["TSS","Sensitivity",,,])
+    xtable(ev.TSS.Sensitivity)
+    ev.ROC.Specificity<-as.data.frame(myBiomodModelEval["ROC","Specificity",,,])
+    xtable(ev.ROC.Specificity)
+    ev.TSS.Specificity<-as.data.frame(myBiomodModelEval["TSS","Specificity",,,])
+    xtable(ev.TSS.Specificity)
+    library(gt)
+    ## plot evaluation models score graph
+    ### by models
+    gg1 <- models_scores_graph( myBiomodModelOut,
+                                by = 'models',
+                                metrics = c('ROC','TSS') )
+    ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\ROC_TSS_Modeles.png",gg1)
+    ## we see a influence of model selected on models capabilities
+    ## e.g. RF are much better than SRE
+    ### by cross validation run
+    gg2 <- models_scores_graph( myBiomodModelOut,
+                                by = 'cv_run',
+                                metrics = c('ROC','TSS') )
+    ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\ROC_TSS_VC.png",gg2)
+    ## there is no difference in models quality if we focus on
+    ## cross validation sampling
+    ### some graphical customisations
+    gg1_custom <-
+      gg1 +
+      ggtitle("Diff between RF and SRE evaluation scores") + ## add title
+      scale_colour_manual(values=c("green", "blue","black","red")) ## change colors
+    gg1_custom
     # get_variables_importance
+    get_variables_importance(myBiomodModelOut)
      get_options(myBiomodModelOut)
     ##' 4. Build ensemble-models that will be taken as reference
     myBiomodEM <- BIOMOD_EnsembleModeling( modeling.output = myBiomodModelOut,
@@ -220,7 +288,7 @@ DataModelF<-dataF@data
     ###' here only for a lone model (i.e "VulpesVulpes_PA1_AllData_GLM")
     myRespPlot3D <-
       response.plot2(
-        models = myGLMs[1],
+        models = myRFs[1],
         Data = get_formal_data(myBiomodModelOut, 'expl.var'),
         show.variables = get_formal_data(myBiomodModelOut, 'expl.var.names'),
         do.bivariate = TRUE,
@@ -238,7 +306,8 @@ DataModelF<-dataF@data
     pred.val<-myRespPlot2D$pred.val
     dimnames(myRespPlot2D)
     dim(myRespPlot3D)
-    dimnames(myRespPlot3D)    
+    dimnames(myRespPlot3D) 
+    myRespPlot3D$id
     ##' 5. Projection on future environmental conditions
     ##' 
     myExpl_fut<-myExpl
@@ -251,6 +320,7 @@ DataModelF<-dataF@data
                                             build.clamping.mask = TRUE)    
 
     plot(myBiomodProjection)
+    class(myBiomodProjection)
     BIOMOD_EnsembleForecasting(projection.output=myBiomodProjection,
                                EM.output=myBiomodEM,
                                binary.meth='TSS') 
@@ -260,7 +330,7 @@ DataModelF<-dataF@data
     projectionsBin <- raster::stack('Faidherbia/proj_future/proj_future_Faidherbia_TSSbin.grd')    
 plot(consensusBin)    
 plot(projectionsBin)
-ggR(projectionsBin,2, geom_raster = TRUE,ggLayer = F) +
+ggR(consensusBin,2, geom_raster = TRUE,ggLayer = F) +
   scale_fill_gradientn(name = "Probabilité", colours = terrain.colors(10))  +
   theme_bw() + xlab("Longitude") + ylab("Latitude")
 ##' 7. build a ref state based on ensemble-models
@@ -283,24 +353,4 @@ ProbDensFunc(initial = ref,
              filename=NULL,
              lim=c(0.5,0.8,0.95))
 ##############""
-## plot evaluation models score graph
-### by models
-gg1 <- models_scores_graph( myBiomodModelOut,
-                            by = 'models',
-                            metrics = c('ROC','TSS') )
-ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\ROC_TSS_Modeles.png",gg1)
-## we see a influence of model selected on models capabilities
-## e.g. RF are much better than SRE
-### by cross validation run
-gg2 <- models_scores_graph( myBiomodModelOut,
-                            by = 'cv_run',
-                            metrics = c('ROC','TSS') )
-ggsave("C:\\Users\\Hp\\OneDrive\\redactions\\ROC_TSS_VC.png",gg2)
-## there is no difference in models quality if we focus on
-## cross validation sampling
-### some graphical customisations
-gg1_custom <-
-  gg1 +
-  ggtitle("Diff between RF and SRE evaluation scores") + ## add title
-  scale_colour_manual(values=c("green", "blue")) ## change colors
-gg1_custom
+
