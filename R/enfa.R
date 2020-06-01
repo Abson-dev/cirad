@@ -107,73 +107,110 @@ AcaciaPr<- Base_Acacia_Z %>%
 #Transform data as SpatialPointDataFrame
 sp::coordinates(AcaciaPr) <-~lon+lat
 sp::proj4string(AcaciaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-########################## Variables sur le Sol
-e <- extent(-16.57, -16.33, 14.45 , 14.65)
-AETI<-raster(lsoil[1])
-AETI.crop<-crop(AETI,e)
-names(AETI.crop)<-"AETI"
-CLYPPT<-raster(lsoil[2])
-CLYPPT.crop<-crop(CLYPPT,e)
-names(CLYPPT.crop)<-"CLYPPT"
-ORCDRC<-raster(lsoil[3])
-ORCDRC.crop<-crop(ORCDRC,e)
-names(ORCDRC.crop)<-"ORCDRC"
-PHIHOX<-raster(lsoil[4])
-PHIHOX.crop<-crop(PHIHOX,e)
-names(PHIHOX.crop)<-"PHIHOX"
-SLTPPT<-raster(lsoil[5])
-SLTPPT.crop<-crop(SLTPPT,e)
-names(SLTPPT.crop)<-"SLTPPT"
-SNDPPT<-raster(lsoil[6])
-SNDPPT.crop<-crop(SNDPPT,e)
-names(SNDPPT.crop)<-"SNDPPT"
-NTO<-raster(lsoil[7])
-NTO.crop<-crop(NTO,e)
-names(NTO.crop)<-"NTO"
-P<-raster(lsoil[8])
-P.crop<-crop(P,e)
-names(P.crop)<-"P"
-NBWP<-raster(lsoil[9])
-NBWP.crop<-crop(NBWP,e)
-names(NBWP.crop)<-"NBWP"
-SINT<-raster(lsoil[10])
-SINT.crop<-crop(SINT,e)
-names(SINT.crop)<-"SINT"
-SOS<-raster(lsoil[11])
-SOS.crop<-crop(SOS,e)
-names(SOS.crop)<-"SOS"
-#CLYPPT.crop,ORCDRC.crop,PHIHOX.crop,SLTPPT.crop,NTO.crop,P.crop,SNDPPT.crop
-AETI<-projectRaster(AETI.crop,P.crop)
-CLYPPT<-projectRaster(CLYPPT.crop,P.crop)
-#Êextent(CLYPPT)<-extent(P.crop)
-ORCDRC<-projectRaster(ORCDRC.crop,P.crop)
-#extent(ORCDRC)<-extent(P.crop)
-PHIHOX<-projectRaster(PHIHOX.crop,P.crop)
-#extent(PHIHOX)<-extent(P.crop)
-SLTPPT<-projectRaster(SLTPPT.crop,P.crop)
-#extent(SLTPPT)<-extent(P.crop)
-NTO<-projectRaster(NTO.crop,P.crop)
-#extent(NTO)<-extent(P.crop)
-SNDPPT<-projectRaster(SNDPPT.crop,P.crop)
-#extent(SNDPPT)<-extent(P.crop)
-NBWP<-projectRaster(NBWP.crop,P.crop)
-SINT<-projectRaster(SINT.crop,P.crop)
-SOS<-projectRaster(SOS.crop,P.crop)
-P<-P.crop
-#,PHIHOX,SLTPPT,NTO,P,SNDPPT
-SoilGrid.crop<-stack(AETI,SINT,SOS,NBWP,CLYPPT,ORCDRC,PHIHOX,SLTPPT,NTO,SNDPPT,P)
-SoilGrid.crop
+# ########################## Variables sur le Sol
+# e <- extent(-16.57, -16.33, 14.45 , 14.65)
+# AETI<-raster(lsoil[1])
+# AETI.crop<-crop(AETI,e)
+# names(AETI.crop)<-"AETI"
+# CLYPPT<-raster(lsoil[2])
+# CLYPPT.crop<-crop(CLYPPT,e)
+# names(CLYPPT.crop)<-"CLYPPT"
+# ORCDRC<-raster(lsoil[3])
+# ORCDRC.crop<-crop(ORCDRC,e)
+# names(ORCDRC.crop)<-"ORCDRC"
+# PHIHOX<-raster(lsoil[4])
+# PHIHOX.crop<-crop(PHIHOX,e)
+# names(PHIHOX.crop)<-"PHIHOX"
+# SLTPPT<-raster(lsoil[5])
+# SLTPPT.crop<-crop(SLTPPT,e)
+# names(SLTPPT.crop)<-"SLTPPT"
+# SNDPPT<-raster(lsoil[6])
+# SNDPPT.crop<-crop(SNDPPT,e)
+# names(SNDPPT.crop)<-"SNDPPT"
+# NTO<-raster(lsoil[7])
+# NTO.crop<-crop(NTO,e)
+# names(NTO.crop)<-"NTO"
+# P<-raster(lsoil[8])
+# P.crop<-crop(P,e)
+# names(P.crop)<-"P"
+# NBWP<-raster(lsoil[9])
+# NBWP.crop<-crop(NBWP,e)
+# names(NBWP.crop)<-"NBWP"
+# SINT<-raster(lsoil[10])
+# SINT.crop<-crop(SINT,e)
+# names(SINT.crop)<-"SINT"
+# SOS<-raster(lsoil[11])
+# SOS.crop<-crop(SOS,e)
+# names(SOS.crop)<-"SOS"
+# #CLYPPT.crop,ORCDRC.crop,PHIHOX.crop,SLTPPT.crop,NTO.crop,P.crop,SNDPPT.crop
+# AETI<-projectRaster(AETI.crop,P.crop)
+# CLYPPT<-projectRaster(CLYPPT.crop,P.crop)
+# #Êextent(CLYPPT)<-extent(P.crop)
+# ORCDRC<-projectRaster(ORCDRC.crop,P.crop)
+# #extent(ORCDRC)<-extent(P.crop)
+# PHIHOX<-projectRaster(PHIHOX.crop,P.crop)
+# #extent(PHIHOX)<-extent(P.crop)
+# SLTPPT<-projectRaster(SLTPPT.crop,P.crop)
+# #extent(SLTPPT)<-extent(P.crop)
+# NTO<-projectRaster(NTO.crop,P.crop)
+# #extent(NTO)<-extent(P.crop)
+# SNDPPT<-projectRaster(SNDPPT.crop,P.crop)
+# #extent(SNDPPT)<-extent(P.crop)
+# NBWP<-projectRaster(NBWP.crop,P.crop)
+# SINT<-projectRaster(SINT.crop,P.crop)
+# SOS<-projectRaster(SOS.crop,P.crop)
+# P<-P.crop
+# #,PHIHOX,SLTPPT,NTO,P,SNDPPT
+# SoilGrid.crop<-stack(AETI,SINT,SOS,NBWP,CLYPPT,ORCDRC,PHIHOX,SLTPPT,NTO,SNDPPT,P)
+# SoilGrid.crop
 ############## ENFA
+########### Voir le fichier BlockCV_for_SDM_Soil.R
 #######Faidherbia albida
 #FaidherbiaPr@bbox <-as.matrix(extent(SoilGrid.crop))
-glc <- GLcenfa(x = SoilGrid.crop)
+nlayers(ENFA_var)
+names(ENFA_var)
+glc <- GLcenfa(x = ENFA_var) 
 FaidherbiaPr@data$Faidherbia.albida<-as.numeric(FaidherbiaPr@data$Faidherbia.albida)
-mod.enfa <- enfa(x = SoilGrid.crop, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
+mod.enfa <- CENFA::enfa(x = ENFA_var, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
 mod.enfa
-scatter(x = mod.enfa, y = glc)
-mod.cnfa <- cnfa(x = SoilGrid.crop, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
+CENFA::scatter(x = mod.enfa, y = glc,n=34,p=1)
+sf.prop<-mod.enfa@sf.prop
+summary(co)
+#.Broken-stick method for detection of significant factors
+brStick(s.factor(mod.enfa))
+#[1] 17
+#Cov<-CENFA::cov.enfa(mod.enfa)
+# correlation matrix
+Z <- CENFA::parScale(ENFA_var)
+mat <- CENFA::parCov(Z)
+ggcorrplot::ggcorrplot(mat,ggtheme = ggplot2::theme_gray,
+           hc.order = TRUE,
+           type = "lower",
+           lab = FALSE,
+           colors = c("#6D9EC1", "white", "#E46726")) 
+pa_dataF <- st_as_sf(Base_Faidherbia_Z, coords = c("lon","lat"), crs = crs(ENFA_var))
+Cor <- raster::extract(ENFA_var, pa_dataF, df = TRUE)
+Cor<-Cor[,-1]
+library(funModeling)
+df_status(Cor)
+# Add correlation significance level
+# --------------------------------
+# Argument p.mat
+# Barring the no significant coefficient
+
+p.mat <- ggcorrplot::cor_pmat(Cor)
+ggcorrplot::ggcorrplot(mat,ggtheme = ggplot2::theme_gray,
+                 hc.order = TRUE,
+                 type = "lower",
+                 p.mat = p.mat,
+                 colors = c("#6D9EC1", "white", "#E46726")) 
+
+
+
+
+mod.cnfa <- CENFA::cnfa(x = ENFA_var, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
 mod.cnfa
-s.map <- sensitivity_map(mod.cnfa)
+s.map <- CENFA::sensitivity_map(mod.cnfa)
 plot(s.map)
 par(mfrow = c(2, 2))
 stretchPlot(s.map, main = "linear")
@@ -181,13 +218,16 @@ stretchPlot(s.map, type = "hist.equal", main = "Histogram equalization")
 stretchPlot(s.map, type = "sd", n = 2, main = "Standard deviation (n = 2)")
 ############## Balanites
 #BalanitesPr@bbox <-as.matrix(extent(SoilGrid.crop))
-glc <- GLcenfa(x = SoilGrid.crop)
+#Aglc <- GLcenfa(x = SoilGrid.crop)
 BalanitesPr@data$Balanites.aegyptiaca<-as.numeric(BalanitesPr@data$Balanites.aegyptiaca)
-mod.enfaB <- enfa(x = SoilGrid.crop, s.dat = BalanitesPr, field = "Balanites.aegyptiaca")
+mod.enfaB <- CENFA::enfa(x = ENFA_var, s.dat = BalanitesPr, field = "Balanites.aegyptiaca")
 mod.enfaB
-scatter(x = mod.enfaB, y = glc)
+brStick(s.factor(mod.enfaB))
+#15
+CENFA::scatter(x = mod.enfaB, y = glc,n=34,p=1)
 mod.cnfaB <- cnfa(x = SoilGrid.crop, s.dat = BalanitesPr, field = "Balanites.aegyptiaca")
 mod.cnfaB
+
 s.mapB <- sensitivity_map(mod.cnfaB)
 plot(s.mapB)
 par(mfrow = c(2, 2))
@@ -195,23 +235,25 @@ stretchPlot(s.mapB, main = "linear")
 stretchPlot(s.mapB, type = "hist.equal", main = "Histogram equalization")
 stretchPlot(s.mapB, type = "sd", n = 2, main = "Standard deviation (n = 2)")
 ####### Anogeissus.leiocarpus
-AnogeissusPr@bbox <-as.matrix(extent(SoilGrid.crop))
-glc <- GLcenfa(x = SoilGrid.crop)
+#glc <- GLcenfa(x = SoilGrid.crop) 
 AnogeissusPr@data$Anogeissus.leiocarpus<-as.numeric(AnogeissusPr@data$Anogeissus.leiocarpus)
-mod.enfaAno <- enfa(x = SoilGrid.crop, s.dat = AnogeissusPr, field = "Anogeissus.leiocarpus")
-mod.enfaAno
-scatter(x = mod.enfaAno, y = glc)
+mod.enfaAno <- CENFA::enfa(x = ENFA_var, s.dat = AnogeissusPr, field = "Anogeissus.leiocarpus")
+mod.enfaAno  
+CENFA::scatter(x = mod.enfaAno, y = glc,n=34,p=1)
+brStick(s.factor(mod.enfaAno))
+#14
 mod.cnfaAno <- cnfa(x = SoilGrid.crop, s.dat = AnogeissusPr, field = "Anogeissus.leiocarpus")
 mod.cnfaAno
 s.mapAno <- sensitivity_map(mod.cnfaAno)
 plot(s.mapAno)
 ######## Adansonia.digitata
-AdansoniaPr@bbox <-as.matrix(extent(SoilGrid.crop))
-glc <- GLcenfa(x = SoilGrid.crop)
 AdansoniaPr@data$Adansonia.digitata<-as.numeric(AdansoniaPr@data$Adansonia.digitata)
-mod.enfaAdan <- enfa(x = SoilGrid.crop, s.dat = AdansoniaPr, field = "Adansonia.digitata")
+mod.enfaAdan <- CENFA::enfa(x = ENFA_var, s.dat = AdansoniaPr, field = "Adansonia.digitata")
 mod.enfaAdan
-scatter(x = mod.enfaAdan, y = glc)
+CENFA::scatter(x = mod.enfaAdan, y = glc,n=34,p=1)
+brStick(m.factor(mod.enfaAdan))
+names(mod.enfaAdan)
+#11
 s.arrow(mod.enfaAdan@co)
 s.arrow(mod.enfaAdan@cov)
 mod.cnfaAdan <- cnfa(x = SoilGrid.crop, s.dat = AdansoniaPr, field = "Adansonia.digitata")
@@ -220,27 +262,29 @@ s.mapAdan <- sensitivity_map(mod.cnfaAdan)
 plot(s.mapAdan)
 
 ########### Acacia.nilotica
-AcaciaPr@bbox <-as.matrix(extent(SoilGrid.crop))
-glc <- GLcenfa(x = SoilGrid.crop)
 AcaciaPr@data$Acacia.nilotica<-as.numeric(AcaciaPr@data$Acacia.nilotica)
-mod.enfaAca <- enfa(x = SoilGrid.crop, s.dat = AcaciaPr, field = "Acacia.nilotica")
+mod.enfaAca <- CENFA::enfa(x = ENFA_var, s.dat = AcaciaPr, field = "Acacia.nilotica")
 mod.enfaAca
-scatter(x = mod.enfaAca, y = glc)
+CENFA::scatter(x = mod.enfaAca, y = glc,n=34,p=1)
+brStick(s.factor(mod.enfaAca))
+#13
+marginality(mod.enfaAca)
+specialization(mod.enfaAca)
 mod.cnfaAca <- cnfa(x = SoilGrid.crop, s.dat = AcaciaPr, field = "Acacia.nilotica")
 mod.cnfaAca
 s.mapAca <- sensitivity_map(mod.cnfaAca)
 plot(s.mapAca)
 ############"
 par(mfrow = c(2, 3))
-scatter(x = mod.enfa, y = glc, n=11,p=1) #Faidherbia.albida
+CENFA::scatter(x = mod.enfa, y = glc, n=35,p=1) #Faidherbia.albida
 title("Faidherbia albida")
-scatter(x = mod.enfaB, y = glc, n=11,p=1) #Balanites.aegyptiaca
+CENFA::scatter(x = mod.enfaB, y = glc, n=35,p=1) #Balanites.aegyptiaca
 title("Balanites aegyptiaca")
-scatter(x = mod.enfaAno, y = glc, n=11,p=1) #Anogeissus.leiocarpus
+CENFA::scatter(x = mod.enfaAno, y = glc, n=35,p=1) #Anogeissus.leiocarpus
 title("Anogeissus leiocarpus")
-scatter(x = mod.enfaAdan, y = glc, n=11,p=1) #Adansonia.digitata
+CENFA::scatter(x = mod.enfaAdan, y = glc, n=35,p=1) #Adansonia.digitata
 title("Adansonia digitata")
-scatter(x = mod.enfaAca, y = glc, n=11,p=1) #Acacia.nilotica
+CENFA::scatter(x = mod.enfaAca, y = glc, n=35,p=1) #Acacia.nilotica
 title("Acacia nilotica")
 ######
 par(mfrow = c(2, 3))

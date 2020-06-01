@@ -1,0 +1,263 @@
+---
+title: "Modélisation de la distribution des principales espèces ligneuses dans deux parcs agroforestiers du bassin arachidier sénégalais"
+author :
+- Aboubacar HEMA 
+
+date: "avril 19, 2020"
+output:
+  word_document:
+    reference_docx: Reference.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Nettoyage de la memoire ------------------------------------------------
+  rm(list = ls()) # Suppression des bases deja existant
+  graphics.off()  # Suppression des graphique deja existant
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Importation des packages ------------------------------------------
+  library(dplyr)
+  library(labelled)
+  library(foreign)
+  library(sf)
+  library(cartography)
+  library(ggplot2)
+  library(scales)
+  library(ggrepel)
+  library(gridExtra)
+  library(ggpubr)
+  library(grid)
+  library(gtable)
+  library(readstata13)
+  library(questionr)
+  library(pwr)
+  library(flextable)
+  library(forcats)
+  require("gdtools")
+  library(emmeans)
+  library(rstatix)
+  library(stringr)
+  library(tidyr)
+  library(tidyr)
+  library(GGally)
+  library(plyr)
+  library(purrr)
+```
+
+```{r include=FALSE}
+# Definition des repertoires de travail --------------------------------- 
+  Chemin <- "C:/Users/TOSHIBA/Google Drive/ENSAE Stage ITS 2020 Aubin Hamadou/2.1. Donnees Utilisables/Base paysan/"
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Importation des bases apurés ----------------------
+  Base_speculation <- read.dta13(file = paste0(Chemin, "Wagrinnova Paysan-spec_tab.dta"),generate.factors = T)
+  Base_info_paysan <- read.dta13(file = paste0(Chemin, "Wagrinnova Paysan.dta"))
+  Base_info_fertilisant <- read.dta13(file = paste0(Chemin, "Wagrinnova Paysan-fertilisant.dta"))
+  Base_general <- read.dta13(file = paste0(Chemin, "Base_general.dta"))
+
+```
+
+```{r include=FALSE}
+# Importation des fonctions utiles pour le traçer des graphiques --------------------------------
+    
+    # Pour le traçer des diagrammes circulaire. 
+    # cette fonction a un nombre limité de parametre. Le reste sera ajouter en fonction du graphique
+    graphique_type_nom_village <- function (Base, var_group, var_freq, var_position){
+                                            ggplot(Base, aes(x="",y = var_freq ,fill = var_group, stat = "bin")) +  geom_bar(width=1, stat = "identity",color = "black")+
+                                            coord_polar(theta = "y") + 
+                                            geom_label_repel(aes(y = var_position,label = paste(freq_village,"%")),color = "black",show.legend = F,size = 4)+
+                                            xlab("") +
+                                            ylab("") +  labs(fill = "")+ 
+                                            theme(
+                                              axis.text.x = element_blank(),
+                                              axis.title.x = element_blank(),
+                                              axis.title.y = element_blank(),
+                                              panel.border = element_blank(),
+                                              panel.grid=element_blank(),
+                                              axis.ticks = element_blank(),
+                                              plot.title=element_text(size=6,color = "black")
+                                            ) 
+    }
+    
+    # Pour les histogrammes.
+    graphique_type_nom_village_hist <- function(Base,abss,freq,interieur){
+                                       ggplot(Base, aes(x=abss,fill = interieur, y = reorder(freq,freq))) +
+                                       geom_bar(stat="identity", position="dodge",color = "black")+
+                                       geom_text(aes(label=freq), vjust=-0.3, color="black",position = position_dodge(0.9), size=3.2)+
+                                       xlab("Source : Enquête Wagrinnova 2019") +
+                                       scale_fill_brewer(type = "seq",direction = -1, palette= "Blues") +
+                                       ylab("") +  labs(fill = "") +
+                                       theme(legend.position="top") +
+                                       theme(
+                                        plot.title = element_text(color="blue", size=10, face="bold",hjust = 0.5),
+                                        axis.title.x = element_text(color="black", size=9),
+                                        axis.title.y = element_text(color="blue", size=10, face="bold"),
+                                        )+
+                                        theme(legend.title = element_text(color = "black", size = 10),
+                                              legend.text = element_text(color = "black",size = 10)) +
+                                        theme( axis.text.y = element_blank(),axis.ticks = element_blank())
+  }
+
+    # Pour l'extraction des legendes
+    get_legend<-function(myggplot){
+                tmp <- ggplot_gtable(ggplot_build(myggplot))
+                leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+                legend <- tmp$grobs[[leg]]
+                return(legend)
+    }
+                    
+    
+    fontname <- "Times New Roman"
+    # Pour les proportions et tableaux
+    disign_freq <- function(tableaux){
+                     b <- data.frame(tableaux)
+                    fontname <- "Times New Roman"
+                    v <- reshape(b,timevar = "Var2",idvar = "Var1",direction = "wide")
+            v <- v %>% 
+                    rename(PIP = Freq.PIP) %>% 
+                    rename(PIV = Freq.PIV) %>% 
+                    rename('Jardin féminin' = `Freq.Jardin féminin`) %>% 
+                    rename(' '=Var1) %>% 
+                    select(-Freq.Ensemble)
+                    font(autofit(flextable(v,theme_fun = theme_box)),fontname = fontname, part = "all")
+    }
+```
+
+## Les speculations cultivées
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Nettoyage de la base speculation -----------------------------------------
+    Base_speculation <- Base_speculation %>%
+                        filter(spec != -1)
+```
+La vallée du fleuve sénégal est un lieu propice pour la culture de divers speculation. Dans les zones enquÃªtés, les principales cultures présentes sont l'oignon, qui represente 41,44% des cultures, en deuxieme position vien
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Spéculations cultivées de façon generale -----------------------------------------
+    prop <- data.frame(round(prop.table(table(Base_speculation$spec_lab))*100,digits = 2)) %>% set_names(c("Spéculations","Pourcentage"))
+    c <- add_footer(flextable(prop,theme_fun = theme_box),top = F,'Spéculations' = "Source Wagrinnova 2019")
+    c <- merge_at(c,j = 1:2,part = "footer")
+    c <- set_caption(font(autofit(c),fontname = fontname, part = "all"),"Répartition des spéculations cultivées.")
+    c
+    
+```
+## Caracteristique des speculations retenu
+
+### Repartition des principales cultures par village
+```{r include=FALSE}
+  # Filtrons tous les speculations inutiles -------------------------------------------------------------------------
+   Base_speculation <- Base_speculation %>% 
+                       separate(parent_key,c("producteur","cle1","cle2"),sep = "/")%>% # cette ligne separe les elements de parent_key
+                       select(-cle1,-cle2) 
+
+  # Information paysan
+   Base_analyse <- Base_info_paysan %>% 
+                   dplyr::rename(producteur = key) %>% 
+                   select(producteur,village) %>% 
+                   left_join(Base_speculation,by = "producteur") %>% 
+                   filter(spec_lab %in% c("Riz","Oignon","Tomate")) %>% 
+                   mutate(prixSemence = qte_semence*cout_unitsem) %>% 
+                   group_by(producteur,spec_lab) %>% 
+                   mutate(prixtotSemence = sum(prixSemence, na.rm = T)) 
+   
+Base_analyse$village <- revalue(Base_analyse$village,c("GUIA" = "Guia", "NDIAWAR"= "Ndiawar","NDIAYENE PENDAO" = "Pendao","NGAOULE" = "Ngaoule","NIANDANE" = "Niandane"))
+```
+
+
+```{r echo=FALSE, fig.align="center", fig.height=4, fig.width=5.5, fig.cap="Répartition des principales cultures par village"}
+  Base <- data.frame(round(lprop(table(Base_analyse$village,Base_analyse$spec_lab)),1)) %>% filter(Var2 != "Total" & Var1 != "Ensemble")
+
+  graphique_type_nom_village_hist(arrange(Base,Var1,desc(Freq)),Base$Var1,Base$Freq,Base$Var2)
+
+```
+
+
+### Statistique descrptive des productions des differentes cultures
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Statistiques descriptives sur les quantitées produites  -----------------------------------------
+    stat_des <- desc_statby(Base_analyse,measure.var = "prixtotSemence",grps = "spec_lab") %>% 
+                select(spec_lab,mean,min,max,sd,cv) %>%
+                mutate(mean = round(mean,digits = 2),sd =round(sd,digits = 2),cv =round(cv,digits = 2)) %>% 
+                set_names(c("Speculation","moyenne","Minimun","Maximun","Ecart-type","cv"))
+
+    c <- add_footer(flextable(stat_des,theme_fun = theme_box),top = F,Speculation = "Source Wagrinnova 2019")
+    c <- merge_at(c,j = 1:6,part = "footer")
+    c <- set_caption(font(autofit(c),fontname = fontname, part = "all"),"Statistiques descriptives des principales cultures")
+    c
+```
+## Le marché des intrants des principales speculations
+
+### Semences
+
+```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=8.5, fig.cap="Répartition des variÃ¨tés de semences par culture"}
+  # Statistiques  -----------------------------------------
+  Base <- Base_analyse %>% filter(spec_lab == "Riz")
+  Base <- data.frame(round(lprop(table(Base$spec_lab,Base$semences)),digits = 1))%>% filter(Var2 != "Total" & Var1 != "Ensemble" & Freq !=0)
+  Riz <- graphique_type_nom_village_hist(Base,Base$Var1,Base$Freq,Base$Var2)+theme(legend.position = "right")+ xlab("")
+  
+  Base2 <- Base_analyse %>% filter(spec_lab == "Tomate")
+  Base2 <- data.frame(round(lprop(table(Base2$spec_lab,Base2$semences)),digits = 1))%>% filter(Var2 != "Total" & Var1 != "Ensemble" & Freq !=0)
+  Tomate <- graphique_type_nom_village_hist(Base2,Base2$Var1,Base2$Freq,Base2$Var2)+theme(legend.position = "right")+ xlab("")
+  
+  
+  Base3 <- Base_analyse %>% filter(spec_lab == "Oignon")
+  Base3 <- data.frame(round(lprop(table(Base3$spec_lab,Base3$semences)),digits = 1))%>% filter(Var2 != "Total" & Var1 != "Ensemble" & Freq !=0)
+  Oignon <- graphique_type_nom_village_hist(Base3,Base3$Var1,Base3$Freq,Base3$Var2)+theme(legend.position = "right")+ xlab("")
+  
+  ggarrange(Riz,Tomate,Oignon,
+            ncol = 2,
+            nrow = 2,widths = c(5.5,5.5,5.5,2))+ xlab("Source : EnquÃªte Wagrinnova 2019")
+ 
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Statistiques  -----------------------------------------
+  prop <- data.frame(round(lprop(table(Base_analyse$spec_lab,Base_analyse$origine_semence)),digits = 2)) 
+  prop <- reshape(prop,timevar = "Var2",idvar = "Var1",direction = "wide") %>% set_names(c("Speculations","Stocks personnels","Achat","Don","PrÃªt","Autre","Total"))
+    c <- add_footer(flextable(prop,theme_fun = theme_box),top = F,Speculations = "Source Wagrinnova 2019")
+    c <- merge_at(c,j = 1:7,part = "footer")
+    c <- set_caption(font(autofit(c),fontname = fontname, part = "all"),"Source dâ€™approvisionnement en semences, par spéculations.")
+    c
+
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Statistiques descriptives sur les quantitées produites  -----------------------------------------
+    stat_des <- desc_statby(Base_analyse,measure.var = "qtespec",grps = "spec_lab") %>% 
+                select(spec_lab,mean,min,max,sd,cv) %>%
+                mutate(mean = round(mean,digits = 2),sd =round(sd,digits = 2),cv =round(cv,digits = 2)) %>% 
+                set_names(c("Speculation","moyenne","Minimun","Maximun","Ecart-type","coefficient de variation"))
+
+    c <- add_footer(flextable(stat_des,theme_fun = theme_box),top = F,Speculation = "Source Wagrinnova 2019")
+    c <- merge_at(c,j = 1:6,part = "footer")
+    c <- set_caption(font(autofit(c),fontname = fontname, part = "all"),"Statistiques descriptives des produits")
+    c
+```
+### Engrais/Fertilisant
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Type de fertilisant par spéculations ------------------------------------
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Intensité d'engrais par superficie --------------------------------------
+```
+
+### Produits phystosanitaire
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Produits phytosanitaire par speculations ----------------------------------------------
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+  # Statistique descriptives des differents produits phytosanitaire ------------------------------------
+```
+
+
+

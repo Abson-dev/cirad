@@ -1,0 +1,2254 @@
+---
+title: "Modélisation de la distribution des principales espèces ligneuses dans deux parcs agroforestiers du bassin arachidier sénégalais"
+author :
+- Aboubacar HEMA 
+
+date: "avril 19, 2020"
+output:
+  word_document:
+    reference_docx: Reference.docx
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Installation des packages
+
+
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+packages <- c("raster", "rasterVis", "RStoolbox","maptools",
+              "rgdal","spdep","ggspatial","blockCV","randomForest","rJava","dismo",
+              "ggpubr","funModeling","tidyselect","ggcorrplot",
+              "adehabitatHS","CENFA")
+ipak(packages)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidyselect)
+#library(SDMSelect)
+library(dplyr)
+library(sf)
+library(raster)
+library(rasterVis)
+library(RStoolbox)
+library(maptools)
+library(rgdal)
+library(spdep)
+library(ggplot2)
+library(ggspatial)
+library(blockCV)
+library(randomForest)
+library(rJava)
+library(dismo)
+library(ggpubr)
+library(questionr)
+```
+
+## Netoyage
+```{r echo=FALSE, message=FALSE, warning=FALSE, , echo=FALSE}
+rm(list = ls()) #Effacement de toutes les données en mémoire
+graphics.off() #Effacement de tous les graphiques en mémoire
+```
+
+## Définitions des fonctions
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+reshapePA<-function(Rasterstack,espece){
+  Pred<-list()
+  data<-as.data.frame(Rasterstack)
+  PA<-reshape(data, direction = "long", varying=1:ncol(data),v.names = c("Pred"),times =1:ncol(data) )
+  PA$Species<-rep(espece,each=nrow(data))
+  PA<-PA[,c("Pred","Species")]
+  BaseStat<-as.data.frame(cprop(table(PA)))
+  BaseStat<-BaseStat %>%
+    filter(Pred!="Total") %>%
+    filter(Species!="Ensemble")
+  
+  BaseStat$Freq<-round(BaseStat$Freq,2) 
+  Pred[["Predict table"]]<-BaseStat
+  plot<-ggbarplot(BaseStat,
+                  x = "Species", y = "Freq",
+                  fill = "Pred",
+                  color = "Pred",
+                  legend="top",label=TRUE,lab.pos = "in",ggtheme = theme_bw()) 
+  
+  Pred[["Plot"]]<-plot
+  return(Pred)
+}
+Explorer<-function (blocks, rasterLayer, speciesData, num) {
+  # records<-blocks$records
+  # records$fold<-1:nrow(records)
+  # records <- records[,c(5,1,2,3,4)] %>% 
+  #   mutate(calcul= round((test_0 + test_1)*100/(test_0 + test_1+train_1 + train_0),digits = 0))
+  # records.p <- ggtexttable(records,rows = NULL, theme = ttheme("mGreen"))
+  # 
+  polyObj <- blocks$blocks
+  folds <- blocks$folds
+  kmax <- length(folds)
+  species <- blocks$species
+  speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer[[1]], 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  mid <- stats::median(map_df$MAP)
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                       ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP")) + 
+    ggplot2::scale_fill_gradient2(low = "darkred", mid = "yellow", 
+                                  high = "darkgreen", midpoint = mid) + ggplot2::guides(fill = FALSE) + 
+    ggplot2::theme_bw() + ggplot2::labs(x = "", y = "")
+  trainSet <- unlist(folds[[num]][1])
+  testSet <- unlist(folds[[num]][2])
+  training <- speciesData[trainSet, ]
+  testing <- speciesData[testSet, ]
+  plotPoly <- polyObj[polyObj$folds ==num,]               
+  plotPoly <- sf::st_as_sf(plotPoly)
+  if (is.null(species)) {
+    if (class(blocks) == "SpatialBlock") {
+      ptr <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = training, 
+                                                                        alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = testing, 
+                                                                        alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+    else {
+      ptr <- basePlot + ggplot2::geom_sf(data = training, 
+                                         alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = testing, 
+                                         alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+  }
+  else {
+    if (class(blocks) == "SpatialBlock") {
+      ptr <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = training, 
+                                                                        ggplot2::aes(color = get(species)), show.legend = "point", 
+                                                                        alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = testing, 
+                                                                        ggplot2::aes(color = get(species)), show.legend = "point", 
+                                                                        alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+    else {
+      ptr <- basePlot + ggplot2::geom_sf(data = training, 
+                                         ggplot2::aes(color = get(species)), show.legend = "point", 
+                                         alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = testing, 
+                                         ggplot2::aes(color = get(species)), show.legend = "point", 
+                                         alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+  }
+  #ptr_pts<-ggpubr::ggarrange(ptr, pts,common.legend = TRUE)
+  #plot(cowplot::plot_grid(ptr, pts))
+  #plot(ggpubr::ggarrange(ptr,records.p, pts))
+  plot(ggpubr::ggarrange(ptr, pts,common.legend = TRUE))
+}
+################end function
+summarise_fold<-function(sb){
+  records<-sb$records
+  records$fold<-1:nrow(records)
+  records <- records[,c(5,1,2,3,4)] %>% 
+    mutate(Pourcentage= round((test_0 + test_1)*100/(test_0 + test_1+train_1 + train_0),digits = 0))
+  plot(ggpubr::ggtexttable(records,rows = NULL, theme = ttheme("mGreen")))
+}
+##########end function
+
+ggR_Predict<-function(RasterLayer){
+  ggR(RasterLayer,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = names(RasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  
+}
+ggR_Predict2<-function(RasterLayer1,RasterLayer2){
+  g1<-ggR(RasterLayer1,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = "(a)") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  g2<-ggR(RasterLayer2,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = "(b)") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  ggpubr::ggarrange(g1,g2,common.legend=TRUE)
+}
+#### presence absence function
+PASpecies<-function ( rasterLayer){
+  #speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                     ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  # ptr <- basePlot + ggplot2::geom_sf(data = speciesData, 
+  #                                    alpha = 0.7, color = "blue", size = 1) +
+  #   ggplot2::theme_bw() + ggplot2::labs(x = "", y = "") 
+  # # +
+  #   ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  # plot(cowplot::plot_grid(ptr))
+  basePlot<-basePlot + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espèce",labels=c("Absence","Présence"))
+  return(basePlot)
+  
+}
+####
+PASpecies2<-function ( rasterLayer1,rasterLayer2){
+  #speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer1, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot1 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                     ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  basePlot1<-basePlot1 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = "(a)") + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espèce",labels=c("Absence","Présence"))
+  samp <- raster::sampleRegular(rasterLayer2, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot2 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                     ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  basePlot2<-basePlot2 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = "(b)") + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espèce",labels=c("Absence","Présence"))
+  ggpubr::ggarrange(basePlot1,basePlot2,common.legend = TRUE)
+  
+  
+}
+Dist<-function ( rasterLayer, speciesData){
+  speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                       ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP")) + 
+    ggplot2::scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))
+  ptr <- basePlot + ggplot2::geom_sf(data = speciesData, 
+                                     alpha = 0.7, color = "blue", size = 1) +
+    ggplot2::theme_bw() + ggplot2::labs(x = "", y = "") 
+  # +
+  #   ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  # plot(cowplot::plot_grid(ptr))
+  return(ptr)
+  
+}
+#######"import species
+Recodificateur <- function(data,espece,varying){
+  for (lag_size in espece) {
+    data <- data %>% 
+      dplyr::mutate(!!sym(lag_size) := as.factor(ifelse(varying == lag_size,1,0)))
+  }
+  return(data)
+}
+######construire des bases des espèces choisies
+Base<-function(Species,coord,espece){
+  Species<-st_drop_geometry(Species)
+  data<-list()
+  for (i in 1:length(espece)) {
+    data[[espece[i]]]<-Species[,c(coord[1],coord[2],espece[i])] 
+    # %>% 
+    #   dplyr::select(coord[1],coord[2],espece[i])
+    
+  }
+  return(data)
+}
+
+Selectpredictors<-function(RasterStack,predictors){
+  if(length(predictors)==1){
+    p<- raster::subset(RasterStack,predictors[[1]]) 
+    p<-list(p)
+    names(p)<-names(predictors)
+    return(p)
+  }
+  else{
+    var<-names(predictors)
+    s<-list()
+
+    p<- raster::subset(RasterStack,predictors[[1]])
+    s[[var[1]]]<-p
+    for (i in 2:length(predictors)) {
+      p<- raster::subset(RasterStack,predictors[[i]])
+      s[[var[i]]]<-p
+    }
+    
+    return (s)
+  }
+  
+  
+}
+```
+## Importation des données 
+### Importation des données de terrain
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+Species<-st_read(filename,quiet = T)
+
+#names(Species)
+#length(espece)
+
+
+
+```
+
+Précisez les noms des différentes espèces à modéliser
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+espece=list()
+espece = c("Faidherbia albida","Balanites aegyptiaca","Anogeissus leiocarpus",
+           "Adansonia digitata","Acacia nilotica")
+Species <- Recodificateur(data = Species,espece = espece,varying = Species$Species)
+```
+Précisez les variables sur la longitude et la latitude
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+coord<-list()
+coord<-c("xcoord","ycoord") #les variables sur la longitude=xcoord et la latitude=ycoord
+Base<-Base(Species,coord,espece)
+```
+### Importations des données raster
+#### Importation des Variables sur le Sol(résolution=250m)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+lsoil<-list.files("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\",patt="\\.tif")
+lsoil<-sprintf("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\%s",lsoil)
+```
+Définition de la zone d'étude(il s'agit du parc à Faidherbia albida )
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+e<-extent(-16.542,-16.348,14.45,14.64)
+```
+Traitement des données
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+AETI<-raster(lsoil[1])
+AETI.crop<-crop(AETI,e)
+names(AETI.crop)<-"AETI"
+CLYPPT<-raster(lsoil[2])
+CLYPPT.crop<-crop(CLYPPT,e)
+names(CLYPPT.crop)<-"CLYPPT"
+ORCDRC<-raster(lsoil[3])
+ORCDRC.crop<-crop(ORCDRC,e)
+names(ORCDRC.crop)<-"ORCDRC"
+PHIHOX<-raster(lsoil[4])
+PHIHOX.crop<-crop(PHIHOX,e)
+names(PHIHOX.crop)<-"PHIHOX"
+SLTPPT<-raster(lsoil[5])
+SLTPPT.crop<-crop(SLTPPT,e)
+names(SLTPPT.crop)<-"SLTPPT"
+SNDPPT<-raster(lsoil[6])
+SNDPPT.crop<-crop(SNDPPT,e)
+names(SNDPPT.crop)<-"SNDPPT"
+NTO<-raster(lsoil[7])
+NTO.crop<-crop(NTO,e)
+names(NTO.crop)<-"NTO"
+P<-raster(lsoil[8])
+P.crop<-crop(P,e)
+names(P.crop)<-"P"
+NBWP<-raster(lsoil[9])
+NBWP.crop<-crop(NBWP,e)
+names(NBWP.crop)<-"NBWP"
+SINT<-raster(lsoil[10])
+SINT.crop<-crop(SINT,e)
+names(SINT.crop)<-"SINT"
+SOS<-raster(lsoil[11])
+SOS.crop<-crop(SOS,e)
+names(SOS.crop)<-"SOS"
+
+##################"
+AETI<-projectRaster(AETI.crop,P.crop)
+CLYPPT<-projectRaster(CLYPPT.crop,P.crop)
+#extent(CLYPPT)<-extent(P.crop)
+ORCDRC<-projectRaster(ORCDRC.crop,P.crop)
+#extent(ORCDRC)<-extent(P.crop)
+PHIHOX<-projectRaster(PHIHOX.crop,P.crop)
+fun <- function(x) { x / 10 }
+PHIHOX<-calc(PHIHOX,fun)
+names(PHIHOX)<-"PHIHOX"
+SLTPPT<-projectRaster(SLTPPT.crop,P.crop)
+NTO<-projectRaster(NTO.crop,P.crop)
+SNDPPT<-projectRaster(SNDPPT.crop,P.crop)
+NBWP<-projectRaster(NBWP.crop,P.crop)
+SINT<-projectRaster(SINT.crop,P.crop)
+SOS<-projectRaster(SOS.crop,P.crop)
+P<-P.crop
+
+SoilGrid.crop<-stack(AETI,SINT,SOS,NBWP,CLYPPT,ORCDRC,PHIHOX,SLTPPT,NTO,SNDPPT,P)
+```
+#### Importation des variables Worlclim(résolution=1km)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+worldclim<-stack(l1)
+
+```
+Délimiter les variables WorldClim dans la zone d'étude
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+worldclim.crop <- crop(worldclim,e)
+```
+Raméner les variables worldclim dans la même résolution que celles du Sol
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+worldclim.crop<-projectRaster(worldclim.crop,P)
+worldclim.crop<-stack(worldclim.crop)
+```
+#### Importation des variables topographiques
+```{r message=FALSE, warning=FALSE, include=FALSE}
+topofilename<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\variables topographiques","\\topo.shp")
+topo <- shapefile(topofilename,verbose=TRUE)
+
+```
+Réprésentation graphique 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+z1<-st_as_sf(topo)
+ggplot(z1)  + geom_sf(aes(fill=Slo1),colour="black") +
+  theme_gray()
+```
+
+#Transformation des variables en raster
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Slo1 <- rasterize(topo, P, field="Slo1")
+names(Slo1)<-"Slo1"
+Len1 <- rasterize(topo, P, field="Len1")
+#plot(Len1)
+names(Len1)<-"Len1"
+#writeRaster(Len1, filename=file.path(tmp, "Len1.tif"), format="GTiff", overwrite=TRUE)
+######
+Sll <- rasterize(topo, P, field="Sll")
+#plot(Sll) # valeur identique
+names(Sll)<-"Sll"
+#writeRaster(Sll, filename=file.path(tmp, "Sll.tif"), format="GTiff", overwrite=TRUE)
+##### 
+Csl <- rasterize(topo, P, field="Csl")
+#plot(Csl)
+names(Csl)<-"Csl"
+#writeRaster(Csl, filename=file.path(tmp, "Csl.tif"), format="GTiff", overwrite=TRUE)
+####
+
+Wid1 <- rasterize(topo, P, field="Wid1")
+#plot(Wid1)
+names(Wid1)<-"Wid1"
+#writeRaster(Wid1, filename=file.path(tmp, "Wid1.tif"), format="GTiff", overwrite=TRUE)
+#############
+Dep1 <- rasterize(topo, P, field="Dep1")
+#plot(Dep1)
+names(Dep1)<-"Dep1"
+#writeRaster(Dep1, filename=file.path(tmp, "Dep1.tif"), format="GTiff", overwrite=TRUE)
+###########
+Elev <- rasterize(topo, P, field="Elev")
+#plot(Elev)
+names(Elev)<-"Elev"
+#writeRaster(Elev, filename=file.path(tmp, "Elev.tif"), format="GTiff", overwrite=TRUE)
+###########
+Vartopo<-stack(Slo1,Len1,Sll,Csl,Wid1,Dep1,Elev)
+```
+## Importation de la variable type de sol dans la zone d'étude
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#filename_zone<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones","\\Diohine_Echantillons_Class.shp")
+# zone_etude<-shapefile(filename_zone)
+# map<-st_as_sf(zone_etude)
+# map$Type_Sol<-as.factor(map$Type_Sol)
+# ggplot(map)  + geom_sf(aes(fill=Type_Sol),colour="black") +
+#   theme_gray() + annotation_scale(location = "bl", width_hint = 0.3) +
+#   annotation_north_arrow(location = "bl", which_north = "true",
+#                          pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+#                          style = north_arrow_fancy_orienteering) +
+#   scale_fill_manual(values=c("blue","green","red")) +  ggtitle(label = "Zone d'étude") +
+#   theme(plot.title = element_text(hjust = 0.5, size = 10)) +
+#   theme(legend.title = element_blank())
+```
+
+##Transformation de la variable type de sol en raster
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Récodification
+#Ferrugineux tropicaux=1,Hydromorphe=2,Hydromorphe Sale=3
+
+# zone_etude@data$Sol<-as.factor(if_else(zone_etude@data$Type_Sol =="Ferrugineux tropicaux","1",if_else(zone_etude@data$Type_Sol =="Hydromorphe","2","3")))
+# Type_Sol <- rasterize(zone_etude, P, field="Sol")
+# names(Type_Sol)<-"Sol"
+# plot(Type_Sol) # pas numéric, nous révenons sur ça plutard
+```
+
+Nous régroupons toutes les variables ensemble
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Variables<-stack(SoilGrid.crop,worldclim.crop,Vartopo)
+#names(Variables)
+```
+# ENFA
+Supprimer les variables bio14,bio19,Sll. En effet, les variables bio14,bio19 et Sll prennent les mêmes valeurs dans la zone d'étude.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#bio14=17,bio19=22,Sll=31
+names(Variables)
+ENFA_var <- dropLayer(Variables, c(17, 22, 33))
+# names(ENFA_var)
+# nlayers(ENFA_var)
+```
+## Constitution des bases de présence des espèces
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia.albida")
+FaidherbiaPr<- Base_Faidherbia_Z %>%
+  filter(Faidherbia.albida ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(FaidherbiaPr) <-~lon+lat
+sp::proj4string(FaidherbiaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+names(Base_Balanites_Z)<-c("lon","lat","Balanites.aegyptiaca")
+BalanitesPr<- Base_Balanites_Z %>%
+  filter(Balanites.aegyptiaca ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(BalanitesPr) <-~lon+lat
+sp::proj4string(BalanitesPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus.leiocarpus")
+AnogeissusPr<- Base_Anogeissus_Z %>%
+  filter(Anogeissus.leiocarpus ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(AnogeissusPr) <-~lon+lat
+sp::proj4string(AnogeissusPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia.digitata")
+AdansoniaPr<- Base_Adansonia_Z %>%
+  filter(Adansonia.digitata ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(AdansoniaPr) <-~lon+lat
+sp::proj4string(AdansoniaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Acacia_Z)<-c("lon","lat","Acacia.nilotica")
+AcaciaPr<- Base_Acacia_Z %>%
+  filter(Acacia.nilotica ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(AcaciaPr) <-~lon+lat
+sp::proj4string(AcaciaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+
+```
+## Coorélation des prédicteurs
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Matrice de corrélation des prédicteurs"}
+library(CENFA)
+glc <- GLcenfa(x = ENFA_var)
+# correlation matrix
+Z <- CENFA::parScale(ENFA_var)
+mat <- CENFA::parCov(Z)
+ggcorrplot::ggcorrplot(mat,ggtheme = ggplot2::theme_gray,
+           hc.order = TRUE,
+           type = "lower",
+           lab = FALSE,
+           colors = c("#6D9EC1", "white", "#E46726")) 
+
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Matrice de corrélation des prédicteurs,avec le niveau de significativité(X=coéfficient de corrélation non significatif)"}
+pa_dataF <- st_as_sf(Base_Faidherbia_Z, coords = c("lon","lat"), crs = crs(ENFA_var))
+Cor <- raster::extract(ENFA_var, pa_dataF, df = TRUE)
+Cor<-Cor[,-1]
+# Add correlation significance level
+# --------------------------------
+# Argument p.mat
+# Barring the no significant coefficient
+
+p.mat <- ggcorrplot::cor_pmat(Cor)
+ggcorrplot::ggcorrplot(mat,ggtheme = ggplot2::theme_gray,
+                 hc.order = TRUE,
+                 type = "lower",
+                 p.mat = p.mat,
+                 colors = c("#6D9EC1", "white", "#E46726"))
+```
+
+
+##ENFA  Faidherbia albida
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Analyse factorielle de la niche écologique (ENFA) de la distribution de Faidherbia albida"}
+FaidherbiaPr@data$Faidherbia.albida<-as.numeric(FaidherbiaPr@data$Faidherbia.albida)
+mod.enfa <- CENFA::enfa(x = ENFA_var, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
+CENFA::scatter(x = mod.enfa, y = glc,n=34,p=1)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+var_expliFaidherbia<-dropLayer(ENFA_var,c("bio2","bio3","bio6"))
+#nlayers(var_expliFaidherbia)
+names(var_expliFaidherbia)
+```
+
+Les variables bio2,bio3 et bio6 n'expliquent pas la pr�sence de Faidherbia
+
+##ENFA  Balanites
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche écologique (ENFA) de la distribution de Balanites aegyptiaca"}
+BalanitesPr@data$Balanites.aegyptiaca<-as.numeric(BalanitesPr@data$Balanites.aegyptiaca)
+mod.enfaB <- CENFA::enfa(x = ENFA_var, s.dat = BalanitesPr, field = "Balanites.aegyptiaca")
+CENFA::scatter(x = mod.enfaB, y = glc,n=34,p=1)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+var_expliBalanites<-dropLayer(ENFA_var,c("bio2","bio3","bio5","bio6","bio7","bio12","bio16"))
+names(var_expliBalanites)
+```
+
+
+
+##ENFA Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche écologique (ENFA) de la distribution de Anogeissus leiocarpus"}
+AnogeissusPr@data$Anogeissus.leiocarpus<-as.numeric(AnogeissusPr@data$Anogeissus.leiocarpus)
+mod.enfaAno <- CENFA::enfa(x = ENFA_var, s.dat = AnogeissusPr, field = "Anogeissus.leiocarpus")
+#mod.enfaAno  
+CENFA::scatter(x = mod.enfaAno, y = glc,n=34,p=1)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+var_expliAnogeissus<-dropLayer(ENFA_var,c("bio2","bio3","bio5","bio6","bio7","bio12","bio16"))
+names(var_expliAnogeissus)
+```
+
+
+##ENFA Adansonia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche écologique (ENFA) de la distribution de Adansonia digitata"}
+AdansoniaPr@data$Adansonia.digitata<-as.numeric(AdansoniaPr@data$Adansonia.digitata)
+mod.enfaAdan <- CENFA::enfa(x = ENFA_var, s.dat = AdansoniaPr, field = "Adansonia.digitata")
+#mod.enfaAdan
+CENFA::scatter(x = mod.enfaAdan, y = glc,n=34,p=1)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+var_expliAdansonia<-dropLayer(ENFA_var,c("bio1","bio2","bio3","bio5","bio6","bio7","bio9",
+                                         "bio11","bio10","bio12","bio13","bio16","Csl","PHIHOX","SOS","SNPPT"))
+names(var_expliAdansonia)
+```
+
+
+##ENFA Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche écologique (ENFA) de la distribution de Acacia nilotica"}
+AcaciaPr@data$Acacia.nilotica<-as.numeric(AcaciaPr@data$Acacia.nilotica)
+mod.enfaAca <- CENFA::enfa(x = ENFA_var, s.dat = AcaciaPr, field = "Acacia.nilotica")
+#mod.enfaAca
+CENFA::scatter(x = mod.enfaAca, y = glc,n=34,p=1) 
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+var_expliAcacia<-dropLayer(ENFA_var,c("bio2","bio3","bio5","bio7","bio10","bio12","bio13","bio15","bio16"))
+names(var_expliAcacia)
+```
+
+#Variables explicatives des espèces
+Toutes les variables qui sont à l'intérieur du polygone(ENFA) gris expliquent de manière significative la présence de l'espèce. Dans la suite de la modélisation, on utilise que ces dites variables. 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Sol<-Type_Sol
+# Sol@data@values<-as.factor(Sol@data@values)
+# ggR(Sol,geom_raster = TRUE,ggLayer = F)
+# # plot(Sol)
+Variables<-ENFA_var
+#ZVariables<-addLayer(Variables,Sol)
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+##############var bioclim
+bioclim<-list(Faidherbia_albida=str_subset(names(var_expliFaidherbia),"bio"),
+              Balanites_aegyptiaca=str_subset(names(var_expliBalanites),"bio"),
+              Anogeissus_leiocarpus=str_subset(names(var_expliAnogeissus),"bio"),
+              Adansonia_digitata=str_subset(names(var_expliAdansonia),"bio"),
+              Acacia_nilotica=str_subset(names(var_expliAcacia),"bio")
+              )
+
+bioclim<-Selectpredictors(Variables,bioclim)
+#################### var haute résolution spatiale
+var_spatiale<-list(Faidherbia_albida=names(var_expliFaidherbia),
+                   Balanites_aegyptiaca=names(var_expliBalanites),
+                   Anogeissus_leiocarpus=names(var_expliAnogeissus),
+                   Adansonia_digitata=names(var_expliAdansonia),
+                   Acacia_nilotica=names(var_expliAcacia)
+)
+var_spatiale<-Selectpredictors(Variables,var_spatiale)
+
+
+```
+
+#Constitution des données de test et d'entrainement
+Nous prenons 20% de données de test et 80% de données d'entrainement.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(1994)
+# witholding a 20% sample for testing 
+fold<-kfold(Base$`Faidherbia albida`,5)
+
+```
+# Modélisation de la distribution des Espèces 
+## Machine learning methods
+### Maxent
+#### Faidherbia albida
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Faidherbia albida: (a)= Non ajout;(b)= Oui"}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia")
+for (i in 1:5) {
+  # occtest <- occF[foldF == i, ]
+  # occtrain <- occ[foldF != i, ]
+  train<-Base_Faidherbia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Faidherbia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Faidherbia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Faidherbia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Faidherbia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Faidherbia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  me_bio[[i]] <- dismo::maxent(bioclim$Faidherbia_albida, p, a) #, factors='Sol'
+  me_Var[[i]] <- dismo::maxent(var_spatiale$Faidherbia_albida, p, a) #, factors='Sol'
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], bioclim$Faidherbia_albida)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_spatiale$Faidherbia_albida)
+  
+}
+MaxentpredFaidherbiabio<-list()
+MaxentpredFaidherbiavar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+MaxentpredFaidherbiabio[[espece[1]]]<-predict(bioclim$Faidherbia_albida, me_bio[[which.max(auc)]])
+MaxentpredFaidherbiabio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredFaidherbiabio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredFaidherbiabio[["PresenceAbsence"]]<-MaxentpredFaidherbiabio[[espece[1]]]>MaxentpredFaidherbiabio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+MaxentpredFaidherbiavar[[espece[1]]]<-predict(var_spatiale$Faidherbia_albida, me_Var[[which.max(auc)]])
+MaxentpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredFaidherbiavar[["PresenceAbsence"]]<-MaxentpredFaidherbiavar[[espece[1]]]>MaxentpredFaidherbiavar[["threshold"]]
+#plot(MaxentpredFaidherbiavar[[espece[1]]]>MaxentpredFaidherbiavar[["threshold"]])
+ggR_Predict2(MaxentpredFaidherbiabio[[espece[1]]],MaxentpredFaidherbiavar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Faidherbia albida(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(MaxentpredFaidherbiabio[["PresenceAbsence"]],MaxentpredFaidherbiavar[["PresenceAbsence"]])
+```
+
+
+
+#### Balanites aegyptiaca
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Balanites aegyptiaca: (a)= Non ajout;(b)= Oui"}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+names(Base_Balanites_Z)<-c("lon","lat","Balanites")
+for (i in 1:5) {
+  # occtest <- occB[foldB == i, ]
+  # occtrain <- occ[foldB != i, ]
+  train<-Base_Balanites_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Balanites==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Balanites==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Balanites_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Balanites==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Balanites==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- maxent(bioclim$Balanites_aegyptiaca, p, a) #, factors='Sol'
+  meB_Var[[i]] <- maxent(var_spatiale$Balanites_aegyptiaca, p, a) #, factors='Sol'
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], bioclim$Balanites_aegyptiaca)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_spatiale$Balanites_aegyptiaca)
+  
+}
+MaxentpredBalanitesbio<-list()
+MaxentpredBalanitesvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+MaxentpredBalanitesbio[[espece[2]]]<-predict(bioclim$Balanites_aegyptiaca, meB_bio[[which.max(auc)]])
+MaxentpredBalanitesbio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredBalanitesbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredBalanitesbio[["PresenceAbsence"]]<-MaxentpredBalanitesbio[[espece[2]]]>MaxentpredBalanitesbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+MaxentpredBalanitesvar[[espece[2]]]<-predict(var_spatiale$Balanites_aegyptiaca, meB_Var[[which.max(auc)]])
+MaxentpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredBalanitesvar[["PresenceAbsence"]]<-MaxentpredBalanitesvar[[espece[2]]]>MaxentpredBalanitesvar[["threshold"]]
+#plot(MaxentpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(MaxentpredBalanitesbio[[espece[2]]],MaxentpredBalanitesvar[[espece[2]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Balanites(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(MaxentpredBalanitesbio[["PresenceAbsence"]],MaxentpredBalanitesvar[["PresenceAbsence"]])
+```
+
+
+
+#### Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Anogeissus leiocarpus: (a)= Non ajout;(b)= Oui"}
+eAno_bio <- list()
+eAno_Var<-list()
+meAno_bio<-list()
+meAno_Var<-list()
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus")
+for (i in 1:5) {
+  # occtest <- occAno[foldAno == i, ]
+  # occtrain <- occ[foldAno != i, ]
+  train<-Base_Anogeissus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Anogeissus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Anogeissus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Anogeissus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Anogeissus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Anogeissus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAno_bio[[i]] <- maxent(bioclim$Anogeissus_leiocarpus, p, a) #, factors='Sol'
+  meAno_Var[[i]] <- maxent(var_spatiale$Anogeissus_leiocarpus, p, a) #, factors='Sol'
+  eAno_bio[[i]] <- evaluate(occtest, bgtest, meAno_bio[[i]], bioclim$Anogeissus_leiocarpus)
+  eAno_Var[[i]] <- evaluate(occtest, bgtest,  meAno_Var[[i]], var_spatiale$Anogeissus_leiocarpus)
+  
+}
+MaxentpredAnogeissusbio<-list()
+MaxentpredAnogeissusvar<-list()
+auc <- sapply(eAno_bio, function(x){x@auc})
+MaxentpredAnogeissusbio[[espece[3]]]<-predict(bioclim$Anogeissus_leiocarpus, meAno_bio[[which.max(auc)]])
+MaxentpredAnogeissusbio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredAnogeissusbio[["threshold"]]<- threshold(eAno_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredAnogeissusbio[["PresenceAbsence"]]<-MaxentpredAnogeissusbio[[espece[3]]]>MaxentpredAnogeissusbio[["threshold"]]
+auc <- sapply(eAno_Var, function(x){x@auc})
+MaxentpredAnogeissusvar[[espece[3]]]<-predict(var_spatiale$Anogeissus_leiocarpus, meAno_Var[[which.max(auc)]])
+MaxentpredAnogeissusvar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredAnogeissusvar[["threshold"]]<- threshold(eAno_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredAnogeissusvar[["PresenceAbsence"]]<-MaxentpredAnogeissusvar[[espece[3]]]>MaxentpredAnogeissusvar[["threshold"]]
+#plot(MaxentpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(MaxentpredAnogeissusbio[[espece[3]]],MaxentpredAnogeissusvar[[espece[3]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Anogeissus(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(MaxentpredAnogeissusbio[["PresenceAbsence"]],MaxentpredAnogeissusvar[["PresenceAbsence"]])
+```
+
+
+
+#### Adansonia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Adansonia digitata: (a)= Non ajout;(b)= Oui"}
+eAdan_bio <- list()
+eAdan_Var<-list()
+meAdan_bio<-list()
+meAdan_Var<-list()
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia")
+for (i in 1:5) {
+  # occtest <- occAdan[foldAdan == i, ]
+  # occtrain <- occ[foldAdan != i, ]
+  train<-Base_Adansonia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Adansonia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Adansonia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Adansonia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Adansonia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Adansonia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAdan_bio[[i]] <- maxent(bioclim$Adansonia_digitata, p, a) #, factors='Sol'
+  meAdan_Var[[i]] <- maxent(var_spatiale$Adansonia_digitata, p, a) #, factors='Sol'
+  eAdan_bio[[i]] <- evaluate(occtest, bgtest, meAdan_bio[[i]], bioclim$Adansonia_digitata)
+  eAdan_Var[[i]] <- evaluate(occtest, bgtest,  meAdan_Var[[i]], var_spatiale$Adansonia_digitata)
+  
+}
+MaxentpredAdansoniabio<-list()
+MaxentpredAdansoniavar<-list()
+auc <- sapply(eAdan_bio, function(x){x@auc})
+MaxentpredAdansoniabio[[espece[4]]]<-predict(bioclim$Adansonia_digitata, meAdan_bio[[which.max(auc)]])
+MaxentpredAdansoniabio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredAdansoniabio[["threshold"]]<- threshold(eAdan_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredAdansoniabio[["PresenceAbsence"]]<-MaxentpredAdansoniabio[[espece[4]]]>MaxentpredAdansoniabio[["threshold"]]
+auc <- sapply(eAdan_Var, function(x){x@auc})
+MaxentpredAdansoniavar[[espece[4]]]<-predict(var_spatiale$Adansonia_digitata, meAdan_Var[[which.max(auc)]])
+MaxentpredAdansoniavar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredAdansoniavar[["threshold"]]<- threshold(eAdan_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredAdansoniavar[["PresenceAbsence"]]<-MaxentpredAdansoniavar[[espece[4]]]>MaxentpredAdansoniavar[["threshold"]]
+#plot(MaxentpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(MaxentpredAdansoniabio[[espece[4]]],MaxentpredAdansoniavar[[espece[4]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Adansonia(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(MaxentpredAdansoniabio[["PresenceAbsence"]],MaxentpredAdansoniavar[["PresenceAbsence"]])
+```
+
+
+#### Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Acacia nilotica: (a)= Non ajout;(b)= Oui"}
+eAca_bio <- list()
+eAca_Var<-list()
+meAca_bio<-list()
+meAca_Var<-list()
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Acacia_Z)<-c("lon","lat","Acacia")
+for (i in 1:5) {
+  # occtest <- occAca[foldAca == i, ]
+  # occtrain <- occ[foldAca != i, ]
+  train<-Base_Acacia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Acacia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Acacia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Acacia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Acacia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Acacia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAca_bio[[i]] <- maxent(bioclim$Acacia_nilotica, p, a) #, factors='Sol'
+  meAca_Var[[i]] <- maxent(var_spatiale$Acacia_nilotica, p, a) #, factors='Sol'
+  eAca_bio[[i]] <- evaluate(occtest, bgtest, meAca_bio[[i]], bioclim$Acacia_nilotica)
+  eAca_Var[[i]] <- evaluate(occtest, bgtest,  meAca_Var[[i]], var_spatiale$Acacia_nilotica)
+  
+}
+MaxentpredAcaciabio<-list()
+MaxentpredAcaciavar<-list()
+auc <- sapply(eAca_bio, function(x){x@auc})
+MaxentpredAcaciabio[[espece[5]]]<-predict(bioclim$Acacia_nilotica, meAca_bio[[which.max(auc)]])
+MaxentpredAcaciabio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredAcaciabio[["threshold"]]<- threshold(eAca_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredAcaciabio[["PresenceAbsence"]]<-MaxentpredAcaciabio[[espece[5]]]>MaxentpredAcaciabio[["threshold"]]
+auc <- sapply(eAca_Var, function(x){x@auc})
+MaxentpredAcaciavar[[espece[5]]]<-predict(var_spatiale$Acacia_nilotica, meAca_Var[[which.max(auc)]])
+MaxentpredAcaciavar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredAcaciavar[["threshold"]]<- threshold(eAca_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredAcaciavar[["PresenceAbsence"]]<-MaxentpredAcaciavar[[espece[5]]]>MaxentpredAcaciavar[["threshold"]]
+#plot(MaxentpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(MaxentpredAcaciabio[[espece[5]]],MaxentpredAcaciavar[[espece[5]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="MaxEnt appliqué à Acacia(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(MaxentpredAcaciabio[["PresenceAbsence"]],MaxentpredAcaciavar[["PresenceAbsence"]])
+```
+
+
+### Etude comparative du modéle de maxent avec les deux types de variables
+#### AUC
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle sans ajout(Non); Modèle avec ajout(Oui)"}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Faidherbia albida",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Faidherbia albida",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Oui"))
+auc <- sapply(eAno_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Non"))
+auc <- sapply(eAno_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Oui"))
+auc <- sapply(eAdan_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Non"))
+auc <- sapply(eAdan_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Oui"))
+auc <- sapply(eAca_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
+auc <- sapply(eAca_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+p <- ggpaired(Evaluation,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              facet.by = "Espece",
+              short.panel.labs = FALSE)
+# Calcul et ajout des p-values
+p + stat_compare_means(label = "p.signif",
+                       paired = TRUE) # séries appariées => test de Wilcoxon
+
+
+```
+
+### Espèce: Modélisation sans ajout
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle Maxent sans ajout(Non)"}
+names(MaxentpredFaidherbiabio[[espece[1]]])<-espece[1]
+names(MaxentpredBalanitesbio[[espece[2]]])<-espece[2]
+names(MaxentpredAnogeissusbio[[espece[3]]])<-espece[3]
+names(MaxentpredAdansoniabio[[espece[4]]])<-espece[4]
+names(MaxentpredAcaciabio[[espece[5]]])<-espece[5]
+ggarrange(ggR_Predict(MaxentpredFaidherbiabio[[espece[1]]]),ggR_Predict(MaxentpredBalanitesbio[[espece[2]]]),ggR_Predict(MaxentpredAnogeissusbio[[espece[3]]]),ggR_Predict(MaxentpredAdansoniabio[[espece[4]]]),
+          ggR_Predict(MaxentpredAcaciabio[[espece[5]]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle Maxent sans ajout(Non)"}
+names(MaxentpredFaidherbiabio[["PresenceAbsence"]])<-espece[1]
+names(MaxentpredBalanitesbio[["PresenceAbsence"]])<-espece[2]
+names(MaxentpredAnogeissusbio[["PresenceAbsence"]])<-espece[3]
+names(MaxentpredAdansoniabio[["PresenceAbsence"]])<-espece[4]
+names(MaxentpredAcaciabio[["PresenceAbsence"]])<-espece[5]
+ggarrange(PASpecies(MaxentpredFaidherbiabio[["PresenceAbsence"]]),PASpecies(MaxentpredBalanitesbio[["PresenceAbsence"]]),PASpecies(MaxentpredAnogeissusbio[["PresenceAbsence"]]),PASpecies(MaxentpredAdansoniabio[["PresenceAbsence"]]),
+          PASpecies(MaxentpredAcaciabio[["PresenceAbsence"]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+r<-stack(MaxentpredFaidherbiabio[["PresenceAbsence"]],
+MaxentpredBalanitesbio[["PresenceAbsence"]],
+MaxentpredAnogeissusbio[["PresenceAbsence"]],
+MaxentpredAdansoniabio[["PresenceAbsence"]],
+MaxentpredAcaciabio[["PresenceAbsence"]])
+Pred<-reshapePA(r,espece)
+Pred$Plot
+
+```
+
+
+
+### Espèce: avec ajout(Oui)
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle Maxent avec ajout(Oui)"}
+names(MaxentpredFaidherbiavar[[espece[1]]])<-espece[1]
+names(MaxentpredBalanitesvar[[espece[2]]])<-espece[2]
+names(MaxentpredAnogeissusvar[[espece[3]]])<-espece[3]
+names(MaxentpredAdansoniavar[[espece[4]]])<-espece[4]
+names(MaxentpredAcaciavar[[espece[5]]])<-espece[5]
+ggarrange(ggR_Predict(MaxentpredFaidherbiavar[[espece[1]]]),ggR_Predict(MaxentpredBalanitesvar[[espece[2]]]),ggR_Predict(MaxentpredAnogeissusvar[[espece[3]]]),ggR_Predict(MaxentpredAdansoniavar[[espece[4]]]),
+          ggR_Predict(MaxentpredAcaciavar[[espece[5]]]),common.legend = TRUE)
+```
+
+### Espèce: Modélisation avec ajout
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle Maxent avec ajout(Oui)"}
+names(MaxentpredFaidherbiavar[[espece[1]]])<-espece[1]
+names(MaxentpredBalanitesvar[[espece[2]]])<-espece[2]
+names(MaxentpredAnogeissusvar[[espece[3]]])<-espece[3]
+names(MaxentpredAdansoniavar[[espece[4]]])<-espece[4]
+names(MaxentpredAcaciavar[[espece[5]]])<-espece[5]
+ggarrange(ggR_Predict(MaxentpredFaidherbiavar[[espece[1]]]),ggR_Predict(MaxentpredBalanitesvar[[espece[2]]]),ggR_Predict(MaxentpredAnogeissusvar[[espece[3]]]),ggR_Predict(MaxentpredAdansoniavar[[espece[4]]]),
+          ggR_Predict(MaxentpredAcaciavar[[espece[5]]]),common.legend = TRUE)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle Maxent avec ajout(Oui)"}
+names(MaxentpredFaidherbiavar[["PresenceAbsence"]])<-espece[1]
+names(MaxentpredBalanitesvar[["PresenceAbsence"]])<-espece[2]
+names(MaxentpredAnogeissusvar[["PresenceAbsence"]])<-espece[3]
+names(MaxentpredAdansoniavar[["PresenceAbsence"]])<-espece[4]
+names(MaxentpredAcaciavar[["PresenceAbsence"]])<-espece[5]
+ggarrange(PASpecies(MaxentpredFaidherbiavar[["PresenceAbsence"]]),PASpecies(MaxentpredBalanitesvar[["PresenceAbsence"]]),PASpecies(MaxentpredAnogeissusvar[["PresenceAbsence"]]),PASpecies(MaxentpredAdansoniavar[["PresenceAbsence"]]),
+          PASpecies(MaxentpredAcaciavar[["PresenceAbsence"]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+r<-stack(MaxentpredFaidherbiavar[["PresenceAbsence"]],
+MaxentpredBalanitesvar[["PresenceAbsence"]],
+MaxentpredAnogeissusvar[["PresenceAbsence"]],
+MaxentpredAdansoniavar[["PresenceAbsence"]],
+MaxentpredAcaciavar[["PresenceAbsence"]])
+Pred<-reshapePA(r,espece)
+Pred$Plot
+```
+
+
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia")
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus")
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia")
+names(Base_Balanites_Z)<-c("lon","lat","Balanites")
+names(Base_Acacia_Z)<-c("lon","lat","Acacia")
+# make a SpatialPointsDataFrame object from data.frame
+########"bioclim
+pa_dataF <- st_as_sf(Base_Faidherbia_Z, coords = c("lon","lat"), crs = crs(bioclim$Faidherbia_albida))
+pa_dataB <- st_as_sf(Base_Balanites_Z, coords = c("lon","lat"), crs = crs(bioclim$Balanites_aegyptiaca))
+pa_dataAno <- st_as_sf(Base_Anogeissus_Z, coords = c("lon","lat"), crs = crs(bioclim$Anogeissus_leiocarpus))
+pa_dataAdan <- st_as_sf(Base_Adansonia_Z, coords = c("lon","lat"), crs = crs(bioclim$Adansonia_digitata))
+pa_dataAca <- st_as_sf(Base_Acacia_Z, coords = c("lon","lat"), crs = crs(bioclim$Acacia_nilotica))
+########### ajout des variables paysagères
+pa_dataFVar <- st_as_sf(Base_Faidherbia_Z, coords = c("lon","lat"), crs = crs(var_spatiale$Faidherbia_albida))
+pa_dataBVar <- st_as_sf(Base_Balanites_Z, coords = c("lon","lat"), crs = crs(var_spatiale$Balanites_aegyptiaca))
+pa_dataAnoVar <- st_as_sf(Base_Anogeissus_Z, coords = c("lon","lat"), crs = crs(var_spatiale$Anogeissus_leiocarpus))
+pa_dataAdanVar <- st_as_sf(Base_Adansonia_Z, coords = c("lon","lat"), crs = crs(var_spatiale$Adansonia_digitata))
+pa_dataAcaVar <- st_as_sf(Base_Acacia_Z, coords = c("lon","lat"), crs = crs(var_spatiale$Acacia_nilotica))
+
+################
+# extract the raster values for the species points as a dataframe
+mydataF <- raster::extract(bioclim$Faidherbia_albida, pa_dataF, df = TRUE)
+#df_status(mydataF)
+mydataB <- raster::extract(bioclim$Balanites_aegyptiaca, pa_dataB, df = TRUE)
+mydataAno <- raster::extract(bioclim$Anogeissus_leiocarpus, pa_dataAno, df = TRUE)
+mydataAdan <- raster::extract(bioclim$Adansonia_digitata, pa_dataAdan, df = TRUE)
+mydataAca <- raster::extract(bioclim$Acacia_nilotica, pa_dataAca, df = TRUE)
+# adding species column to the dataframe
+mydataF$Faidherbia <- as.factor(pa_dataF$Faidherbia)
+#mydataF$Sol<-as.factor(mydataF$Sol)
+mydataB$Balanites <- as.factor(pa_dataB$Balanites)
+#mydataB$Sol<-as.factor(mydataB$Sol)
+mydataAno$Anogeissus <- as.factor(pa_dataAno$Anogeissus)
+#mydataAno$Sol<-as.factor(mydataAno$Sol)
+mydataAdan$Adansonia<-as.factor(pa_dataAdan$Adansonia)
+#mydataAdan$Sol<-as.factor(mydataAdan$Sol)
+mydataAca$Acacia<-as.factor(pa_dataAca$Acacia)
+#mydataAca$Sol<-as.factor(mydataAca$Sol)
+# remove extra column (ID)
+mydataF <- mydataF[,-1]
+mydataB <- mydataB[,-1]
+mydataAno <- mydataAno[,-1]
+mydataAdan <- mydataAdan[,-1]
+mydataAca <- mydataAca[,-1]
+###################
+################
+# extract the raster values for the species points as a dataframe
+mydataFVar <- raster::extract(var_spatiale$Faidherbia_albida, pa_dataFVar, df = TRUE)
+mydataBVar <- raster::extract(var_spatiale$Balanites_aegyptiaca, pa_dataBVar, df = TRUE)
+mydataAnoVar <- raster::extract(var_spatiale$Anogeissus_leiocarpus, pa_dataAnoVar, df = TRUE)
+mydataAdanVar <- raster::extract(var_spatiale$Adansonia_digitata, pa_dataAdanVar, df = TRUE)
+mydataAcaVar <- raster::extract(var_spatiale$Acacia_nilotica, pa_dataAcaVar, df = TRUE)
+# adding species column to the dataframe
+mydataFVar$Faidherbia <- as.factor(pa_dataFVar$Faidherbia)
+#mydataFVar$Sol<-as.factor(mydataFVar$Sol)
+mydataBVar$Balanites <- as.factor(pa_dataBVar$Balanites)
+#mydataBVar$Sol<-as.factor(mydataBVar$Sol)
+mydataAnoVar$Anogeissus <- as.factor(pa_dataAnoVar$Anogeissus)
+#mydataAnoVar$Sol<-as.factor(mydataAnoVar$Sol)
+mydataAdanVar$Adansonia<-as.factor(pa_dataAdanVar$Adansonia)
+#mydataAdanVar$Sol<-as.factor(mydataAdanVar$Sol)
+mydataAcaVar$Acacia<-as.factor(pa_dataAcaVar$Acacia)
+#mydataAcaVar$Sol<-as.factor(mydataAcaVar$Sol)
+# remove extra column (ID)
+mydataFVar <- mydataFVar[,-1]
+mydataBVar <- mydataBVar[,-1]
+mydataAnoVar <- mydataAnoVar[,-1]
+mydataAdanVar <- mydataAdanVar[,-1]
+mydataAcaVar <- mydataAcaVar[,-1]
+###################
+```
+## RandomForest
+###Faidherbia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Faidherbia: (a)= Non ajout;(b)= Oui"}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+for (i in 1:5) {
+testpres <- mydataF[mydataF[fold == i,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+testbackg <- mydataF[mydataF[fold == i,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- randomForest(as.numeric(Faidherbia)~., mydataF[fold != i, ], na.action=na.omit)
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+testbackg <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+me_Var[[i]] <- randomForest(as.numeric(Faidherbia)~., mydataFVar[fold != i, ], na.action=na.omit)
+   eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredFaidherbiabio<-list()
+RandomForestpredFaidherbiavar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredFaidherbiabio[[espece[1]]]<-predict(bioclim$Faidherbia_albida, me_bio[[which.max(auc)]])
+RandomForestpredFaidherbiabio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFaidherbiabio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFaidherbiabio[["PresenceAbsence"]]<-RandomForestpredFaidherbiabio[[espece[1]]]>RandomForestpredFaidherbiabio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredFaidherbiavar[[espece[1]]]<-predict(var_spatiale$Faidherbia_albida, me_Var[[which.max(auc)]])
+RandomForestpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFaidherbiavar[["PresenceAbsence"]]<-RandomForestpredFaidherbiavar[[espece[1]]]>RandomForestpredFaidherbiavar[["threshold"]]
+#plot(RandomForestpredFaidherbiavar[[espece[1]]]>RandomForestpredFaidherbiavar[["threshold"]])
+ggR_Predict2(RandomForestpredFaidherbiabio[[espece[1]]],RandomForestpredFaidherbiavar[[espece[1]]])
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Faidherbia(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+
+PASpecies2(RandomForestpredFaidherbiabio[["PresenceAbsence"]],RandomForestpredFaidherbiavar[["PresenceAbsence"]])
+```
+
+### Balanites
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Balanites: (a)= Non ajout;(b)= Oui"}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+
+for (i in 1:5) {
+  testpres <- mydataB[mydataB[fold == i,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[fold == i,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- randomForest(as.numeric(Balanites)~., mydataB[fold != i, ], na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- randomForest(as.numeric(Balanites)~., mydataBVar[fold != i, ], na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredBalanitesbio<-list()
+RandomForestpredBalanitesvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredBalanitesbio[[espece[2]]]<-predict(bioclim$Balanites_aegyptiaca, meB_bio[[which.max(auc)]])
+RandomForestpredBalanitesbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredBalanitesbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredBalanitesbio[["PresenceAbsence"]]<-RandomForestpredBalanitesbio[[espece[2]]]>RandomForestpredBalanitesbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredBalanitesvar[[espece[2]]]<-predict(var_spatiale$Balanites_aegyptiaca, meB_Var[[which.max(auc)]])
+RandomForestpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredBalanitesvar[["PresenceAbsence"]]<-RandomForestpredBalanitesvar[[espece[2]]]>RandomForestpredBalanitesvar[["threshold"]]
+#plot(RandomForestpredBalanitesvar[[espece[2]]]>RandomForestpredBalanitesvar[["threshold"]])
+ggR_Predict2(RandomForestpredBalanitesbio[[espece[2]]],RandomForestpredBalanitesvar[[espece[2]]])
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Balanites(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(RandomForestpredBalanitesbio[["PresenceAbsence"]],RandomForestpredBalanitesvar[["PresenceAbsence"]])
+```
+
+### Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Anogeissus: (a)= Non ajout;(b)= Oui"}
+eAno_bio <- list()
+eAno_Var<-list()
+meAno_bio<-list()
+meAno_Var<-list()
+
+for (i in 1:5) {
+  testpres <- mydataAno[mydataAno[fold == i,ncol(mydataAno)] == 1, 1:(ncol(mydataAno)-1)]
+  testbackg <- mydataAno[mydataAno[fold == i,ncol(mydataAno)] == 0, 1:(ncol(mydataAno)-1)]
+  meAno_bio[[i]] <- randomForest(as.numeric(Anogeissus)~., mydataAno[fold != i, ], na.action=na.omit)
+  eAno_bio[[i]] <- dismo::evaluate(testpres, testbackg, meAno_bio[[i]])
+  testpres <- mydataAnoVar[mydataAnoVar[fold == i,ncol(mydataAnoVar)] == 1, 1:ncol(mydataAnoVar)-1]
+  testbackg <- mydataAnoVar[mydataAnoVar[fold == i,ncol(mydataAnoVar)] == 0, 1:ncol(mydataAnoVar)-1]
+  meAno_Var[[i]] <- randomForest(as.numeric(Anogeissus)~., mydataAnoVar[fold != i, ], na.action=na.omit)
+  eAno_Var[[i]] <- dismo::evaluate(testpres, testbackg, meAno_Var[[i]])
+}
+RandomForestpredAnogeissusbio<-list()
+RandomForestpredAnogeissusvar<-list()
+auc <- sapply(eAno_bio, function(x){x@auc})
+RandomForestpredAnogeissusbio[[espece[3]]]<-predict(bioclim$Anogeissus_leiocarpus, meAno_bio[[which.max(auc)]])
+RandomForestpredAnogeissusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredAnogeissusbio[["threshold"]]<- threshold(eAno_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredAnogeissusbio[["PresenceAbsence"]]<-RandomForestpredAnogeissusbio[[espece[3]]]>RandomForestpredAnogeissusbio[["threshold"]]
+auc <- sapply(eAno_Var, function(x){x@auc})
+RandomForestpredAnogeissusvar[[espece[3]]]<-predict(var_spatiale$Anogeissus_leiocarpus, meAno_Var[[which.max(auc)]])
+RandomForestpredAnogeissusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredAnogeissusvar[["threshold"]]<- threshold(eAno_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredAnogeissusvar[["PresenceAbsence"]]<-RandomForestpredAnogeissusvar[[espece[3]]]>RandomForestpredAnogeissusvar[["threshold"]]
+#plot(RandomForestpredAnogeissusvar[[espece[2]]]>RandomForestpredAnogeissusvar[["threshold"]])
+ggR_Predict2(RandomForestpredAnogeissusbio[[espece[3]]],RandomForestpredAnogeissusvar[[espece[3]]])
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Anogeissus(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+
+PASpecies2(RandomForestpredAnogeissusbio[["PresenceAbsence"]],RandomForestpredAnogeissusvar[["PresenceAbsence"]])
+```
+
+### Adansonia
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Adansonia: (a)= Non ajout;(b)= Oui"}
+eAdan_bio <- list()
+eAdan_Var<-list()
+meAdan_bio<-list()
+meAdan_Var<-list()
+
+for (i in 1:5) {
+  testpres <- mydataAdan[mydataAdan[fold == i,ncol(mydataAdan)] == 1, 1:(ncol(mydataAdan)-1)]
+  testbackg <- mydataAdan[mydataAdan[fold == i,ncol(mydataAdan)] == 0, 1:(ncol(mydataAdan)-1)]
+  meAdan_bio[[i]] <- randomForest(as.numeric(Adansonia)~., mydataAdan[fold != i, ], na.action=na.omit)
+  eAdan_bio[[i]] <- dismo::evaluate(testpres, testbackg, meAdan_bio[[i]])
+  testpres <- mydataAdanVar[mydataAdanVar[fold == i,ncol(mydataAdanVar)] == 1, 1:ncol(mydataAdanVar)-1]
+  testbackg <- mydataAdanVar[mydataAdanVar[fold == i,ncol(mydataAdanVar)] == 0, 1:ncol(mydataAdanVar)-1]
+  meAdan_Var[[i]] <- randomForest(as.numeric(Adansonia)~., mydataAdanVar[fold != i, ], na.action=na.omit)
+  eAdan_Var[[i]] <- dismo::evaluate(testpres, testbackg, meAdan_Var[[i]])
+}
+RandomForestpredAdansoniabio<-list()
+RandomForestpredAdansoniavar<-list()
+auc <- sapply(eAdan_bio, function(x){x@auc})
+RandomForestpredAdansoniabio[[espece[4]]]<-predict(bioclim$Adansonia_digitata, meAdan_bio[[which.max(auc)]])
+RandomForestpredAdansoniabio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredAdansoniabio[["threshold"]]<- threshold(eAdan_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredAdansoniabio[["PresenceAbsence"]]<-RandomForestpredAdansoniabio[[espece[4]]]>RandomForestpredAdansoniabio[["threshold"]]
+auc <- sapply(eAdan_Var, function(x){x@auc})
+RandomForestpredAdansoniavar[[espece[4]]]<-predict(var_spatiale$Adansonia_digitata, meAdan_Var[[which.max(auc)]])
+RandomForestpredAdansoniavar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredAdansoniavar[["threshold"]]<- threshold(eAdan_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredAdansoniavar[["PresenceAbsence"]]<-RandomForestpredAdansoniavar[[espece[4]]]>RandomForestpredAdansoniavar[["threshold"]]
+#plot(RandomForestpredAdansoniavar[[espece[4]]]>RandomForestpredAdansoniavar[["threshold"]])
+ggR_Predict2(RandomForestpredAdansoniabio[[espece[4]]],RandomForestpredAdansoniavar[[espece[4]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Adansonia(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+
+PASpecies2(RandomForestpredAdansoniabio[["PresenceAbsence"]],RandomForestpredAdansoniavar[["PresenceAbsence"]])
+```
+
+
+### Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Acacia nilotica: (a)= Non ajout;(b)= Oui"}
+eAca_bio <- list()
+eAca_Var<-list()
+meAca_bio<-list()
+meAca_Var<-list()
+
+for (i in 1:5) {
+  testpres <- mydataAca[mydataAca[fold == i,ncol(mydataAca)] == 1, 1:(ncol(mydataAca)-1)]
+  testbackg <- mydataAca[mydataAca[fold == i,ncol(mydataAca)] == 0, 1:(ncol(mydataAca)-1)]
+  meAca_bio[[i]] <- randomForest(as.numeric(Acacia)~., mydataAca[fold != i, ], na.action=na.omit)
+  eAca_bio[[i]] <- dismo::evaluate(testpres, testbackg, meAca_bio[[i]])
+  testpres <- mydataAcaVar[mydataAcaVar[fold == i,ncol(mydataAcaVar)] == 1, 1:ncol(mydataAcaVar)-1]
+  testbackg <- mydataAcaVar[mydataAcaVar[fold == i,ncol(mydataAcaVar)] == 0, 1:ncol(mydataAcaVar)-1]
+  meAca_Var[[i]] <- randomForest(as.numeric(Acacia)~., mydataAcaVar[fold != i, ], na.action=na.omit)
+  eAca_Var[[i]] <- dismo::evaluate(testpres, testbackg, meAca_Var[[i]])
+}
+RandomForestpredAcaciabio<-list()
+RandomForestpredAcaciavar<-list()
+auc <- sapply(eAca_bio, function(x){x@auc})
+RandomForestpredAcaciabio[[espece[5]]]<-predict(bioclim$Acacia_nilotica, meAca_bio[[which.max(auc)]])
+RandomForestpredAcaciabio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredAcaciabio[["threshold"]]<- threshold(eAca_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredAcaciabio[["PresenceAbsence"]]<-RandomForestpredAcaciabio[[espece[5]]]>RandomForestpredAcaciabio[["threshold"]]
+auc <- sapply(eAca_Var, function(x){x@auc})
+RandomForestpredAcaciavar[[espece[5]]]<-predict(var_spatiale$Acacia_nilotica, meAca_Var[[which.max(auc)]])
+RandomForestpredAcaciavar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredAcaciavar[["threshold"]]<- threshold(eAca_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredAcaciavar[["PresenceAbsence"]]<-RandomForestpredAcaciavar[[espece[5]]]>RandomForestpredAcaciavar[["threshold"]]
+#plot(RandomForestpredAcaciavar[[espece[5]]]>RandomForestpredAcaciavar[["threshold"]])
+ggR_Predict2(RandomForestpredAcaciabio[[espece[5]]],RandomForestpredAcaciavar[[espece[5]]])
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="RandomForest appliqué à Acacia(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(RandomForestpredAcaciabio[["PresenceAbsence"]],RandomForestpredAcaciavar[["PresenceAbsence"]])
+
+```
+
+### Etude comparative RandomForest avec les deux types de variables
+#### AUC
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle sans ajout(Non); Modèle avec ajout(Oui)"}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Faidherbia albida",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Faidherbia albida",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Oui"))
+auc <- sapply(eAno_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Non"))
+auc <- sapply(eAno_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Oui"))
+auc <- sapply(eAdan_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Non"))
+auc <- sapply(eAdan_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Oui"))
+auc <- sapply(eAca_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
+auc <- sapply(eAca_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+p <- ggpaired(Evaluation,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              facet.by = "Espece",
+              short.panel.labs = FALSE)
+# Calcul et ajout des p-values
+p + stat_compare_means(label = "p.signif",
+                       paired = TRUE) # séries appariées => test de Wilcoxon
+```
+
+### Espèce: Modélisation sans ajout
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle RandomForest sans ajout(Non)"}
+names(RandomForestpredFaidherbiabio[[espece[1]]])<-espece[1]
+names(RandomForestpredBalanitesbio[[espece[2]]])<-espece[2]
+names(RandomForestpredAnogeissusbio[[espece[3]]])<-espece[3]
+names(RandomForestpredAdansoniabio[[espece[4]]])<-espece[4]
+names(RandomForestpredAcaciabio[[espece[5]]])<-espece[5]
+ggarrange(ggR_Predict(RandomForestpredFaidherbiabio[[espece[1]]]),ggR_Predict(RandomForestpredBalanitesbio[[espece[2]]]),ggR_Predict(RandomForestpredAnogeissusbio[[espece[3]]]),ggR_Predict(RandomForestpredAdansoniabio[[espece[4]]]),
+          ggR_Predict(RandomForestpredAcaciabio[[espece[5]]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle RandomForest sans ajout(Non)"}
+names(RandomForestpredFaidherbiabio[["PresenceAbsence"]])<-espece[1]
+names(RandomForestpredBalanitesbio[["PresenceAbsence"]])<-espece[2]
+names(RandomForestpredAnogeissusbio[["PresenceAbsence"]])<-espece[3]
+names(RandomForestpredAdansoniabio[["PresenceAbsence"]])<-espece[4]
+names(RandomForestpredAcaciabio[["PresenceAbsence"]])<-espece[5]
+ggarrange(PASpecies(RandomForestpredFaidherbiabio[["PresenceAbsence"]]),PASpecies(RandomForestpredBalanitesbio[["PresenceAbsence"]]),PASpecies(RandomForestpredAnogeissusbio[["PresenceAbsence"]]),PASpecies(RandomForestpredAdansoniabio[["PresenceAbsence"]]),
+          PASpecies(RandomForestpredAcaciabio[["PresenceAbsence"]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+r<-stack(RandomForestpredFaidherbiabio[["PresenceAbsence"]],
+         RandomForestpredBalanitesbio[["PresenceAbsence"]],
+         RandomForestpredAnogeissusbio[["PresenceAbsence"]],
+         RandomForestpredAdansoniabio[["PresenceAbsence"]],
+         RandomForestpredAcaciabio[["PresenceAbsence"]])
+Pred<-reshapePA(r,espece)
+Pred$Plot
+```
+
+### Espèce: Modélisation avec ajout
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle RandomForest avec ajout(Oui)"}
+names(RandomForestpredFaidherbiavar[[espece[1]]])<-espece[1]
+names(RandomForestpredBalanitesvar[[espece[2]]])<-espece[2]
+names(RandomForestpredAnogeissusvar[[espece[3]]])<-espece[3]
+names(RandomForestpredAdansoniavar[[espece[4]]])<-espece[4]
+names(RandomForestpredAcaciavar[[espece[5]]])<-espece[5]
+ggarrange(ggR_Predict(RandomForestpredFaidherbiavar[[espece[1]]]),ggR_Predict(RandomForestpredBalanitesvar[[espece[2]]]),ggR_Predict(RandomForestpredAnogeissusvar[[espece[3]]]),ggR_Predict(RandomForestpredAdansoniavar[[espece[4]]]),
+          ggR_Predict(RandomForestpredAcaciavar[[espece[5]]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle RandomForest avec ajout(Non)"}
+names(RandomForestpredFaidherbiavar[["PresenceAbsence"]])<-espece[1]
+names(RandomForestpredBalanitesvar[["PresenceAbsence"]])<-espece[2]
+names(RandomForestpredAnogeissusvar[["PresenceAbsence"]])<-espece[3]
+names(RandomForestpredAdansoniavar[["PresenceAbsence"]])<-espece[4]
+names(RandomForestpredAcaciavar[["PresenceAbsence"]])<-espece[5]
+ggarrange(PASpecies(RandomForestpredFaidherbiavar[["PresenceAbsence"]]),PASpecies(RandomForestpredBalanitesvar[["PresenceAbsence"]]),PASpecies(RandomForestpredAnogeissusvar[["PresenceAbsence"]]),PASpecies(RandomForestpredAdansoniavar[["PresenceAbsence"]]),
+          PASpecies(RandomForestpredAcaciavar[["PresenceAbsence"]]),common.legend = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+r<-stack(RandomForestpredFaidherbiavar[["PresenceAbsence"]],
+         RandomForestpredBalanitesvar[["PresenceAbsence"]],
+         RandomForestpredAnogeissusvar[["PresenceAbsence"]],
+         RandomForestpredAdansoniavar[["PresenceAbsence"]],
+         RandomForestpredAcaciavar[["PresenceAbsence"]])
+Pred<-reshapePA(r,espece)
+Pred$Plot
+```
+
+
+
+### GLM
+###Faidherbia
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+GLMpredFaidherbiabio<-list()
+GLMpredFaidherbiavar<-list()
+for (i in 1:5) {
+testpres <- mydataF[mydataF[fold == i,ncol(mydataF)] == 1, 1:ncol(mydataF)-1]
+testbackg <- mydataF[mydataF[fold == i,ncol(mydataF)] == 0, 1:ncol(mydataF)-1]
+# testpres[ ,'Sol'] = factor(testpres[ ,'Sol'], levels=1:3)
+# testbackg[ ,'Sol'] = factor(testbackg[ ,'Sol'], levels=1:3)
+  me_bio[[i]] <- glm(Faidherbia~., mydataF[fold != i, ],
+            family = binomial(link = "logit"), na.action=na.omit)
+  GLMpredFaidherbiabio[[i]] <- predict(bioclim$Faidherbia_albida, me_bio[[i]])
+  #plot(ps)
+  #eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, gm)
+  testpres <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+testbackg <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+me_Var[[i]] <- glm(Faidherbia~., mydataFVar[fold != i, ],
+            family = binomial(link = "logit"), na.action=na.omit)
+   #eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, gm)
+GLMpredFaidherbiavar[[i]] <- predict(var_spatiale$Faidherbia_albida, me_Var[[i]])
+ #plot(ps) 
+}
+plot(GLMpredFaidherbiavar[[1]])
+```
+## SVM
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+library(kernlab)
+for (i in 1:5) {
+testpres <- mydataF[mydataF[fold == i,ncol(mydataF)] == 1, 1:(ncol(mydataF)-2)]
+testbackg <- mydataF[mydataF[fold == i,ncol(mydataF)] == 0, 1:(ncol(mydataF)-2)]
+# testpres[ ,'Sol'] = factor(testpres[ ,'Sol'], levels=1:3)
+# testbackg[ ,'Sol'] = factor(testbackg[ ,'Sol'], levels=1:3)
+  svm <- ksvm(Faidherbia~., mydataF[fold != i,-(ncol(mydataF)-1)])
+  #pssvm <- predict(bioclim$Faidherbia_albida, svm)
+  #plot(pssvm)
+  eF_bio[[i]] <- evaluate(testpres, testbackg, gm)
+  testpres <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 1, 1:(ncol(mydataFVar)-1)]
+testbackg <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 0, 1:(ncol(mydataFVar)-1)]
+svm <- ksvm(as.numeric(Faidherbia)~., mydataFVar[fold != i, ])
+pssvm <- predict(var_spatiale$Faidherbia_albida, svm)
+   eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, svm)
+plot(pssvm)
+  
+}
+```
+
+
+
+
+
+
+##Modélisation avec les méthodes de profil
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# bioclim<-list(Faidherbia_albida=c("bio1",	"bio4",	"bio8",	"bio9",	"bio10","bio11","bio12",	"bio13",	"bio15",	"bio16",	"bio17",	"bio18"),
+#               Balanites_aegyptiaca=c("bio1",	"bio4",	"bio8",	"bio9",	"bio10",	"bio11",	"bio12",	"bio13",	"bio15",	"bio16",	"bio17",	"bio18"),
+#               Anogeissus_leiocarpus=c("bio1",	"bio4",	"bio8",	"bio9",	"bio10",	"bio11","bio12",	"bio13",	"bio15","bio16",	"bio17",	"bio18"),
+#               Adansonia_digitata=c("bio1","bio4",	"bio8",	"bio9",	"bio10",	"bio11","bio13",	"bio15",	"bio17",	"bio18"),
+#               Acacia_nilotica=c("bio1",	"bio4",	"bio8",	"bio9",	"bio10",	"bio11",	"bio12",	"bio13",	"bio15", "bio17",	"bio18")
+#               )
+# 
+# bioclim<-Selectpredictors(Variables,bioclim)
+# #################### var haute résolution spatiale
+# var_spatiale<-list(Faidherbia_albida=c("AETI","SINT",	"SOS",		"NBWP",	"CLYPPT",	"ORCDRC",	"SLTPPT",	"PHIHOX",	"NTO",	"SNDPPT",	"P",	"Slo1",	"Len1",	"Wid1",	"Dep1",	"Elev"
+# ,"bio1",	"bio4",	"bio8",	"bio9",	"bio10","bio11","bio12",	"bio13",	"bio15",	"bio16",	"bio17",	"bio18"),
+#                    Balanites_aegyptiaca=c("AETI","SINT",	"SOS",		"NBWP",	"CLYPPT",	"ORCDRC",	"SLTPPT",	"PHIHOX",	"NTO",	"SNDPPT",	"P",	"Slo1",	"Len1",	"Wid1",	"Dep1",	"Elev",
+#                                           "bio1",	"bio4",	"bio8",	"bio9",	"bio10",	"bio11",	"bio12",	"bio13",	"bio15",	"bio16",	"bio17",	"bio18"),
+#                    Anogeissus_leiocarpus=c("SINT",	"SOS",	"AETI",	"NBWP",	"CLYPPT",	"ORCDRC",	"SLTPPT",	"PHIHOX",	"NTO",	"SNDPPT",	"P",	"Slo1",	"Len1",	"Wid1",	"Dep1",	"Elev",
+#                                            "bio1",	"bio4",	"bio8",	"bio9",	"bio10",	"bio11","bio12",	"bio13",	"bio15","bio16",	"bio17",	"bio18"),
+#                    Adansonia_digitata=c("SINT",	"SOS",	"AETI",	"NBWP",	"CLYPPT",	"ORCDRC",	"SLTPPT",	"NTO",	"SNDPPT",	"P",	"Slo1",	"Len1",	"Wid1",	"Dep1",	"Elev",
+#                                         "bio1","bio4",	"bio8",	"bio9",	"bio10",	"bio11","bio13",	"bio15",	"bio17",	"bio18"),
+#                    Acacia_nilotica=c("SINT",	"SOS",	"AETI",	"NBWP",	"CLYPPT",	"ORCDRC",	"SLTPPT",	"NTO",	"SNDPPT",	"P",	"Slo1",	"Len1",	"Wid1",	"Dep1",	"Elev",
+#                                      "bio1",	"bio4",	"bio8",	"bio9",	"bio10",	"bio11",	"bio12",	"bio13",	"bio15", "bio17",	"bio18")
+# )
+# var_spatiale<-Selectpredictors(Variables,var_spatiale)
+```
+
+###bioclim
+####Faidherbia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia")
+for (i in 1:5) {
+  # occtest <- occF[foldF == i, ]
+  # occtrain <- occ[foldF != i, ]
+  train<-Base_Faidherbia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Faidherbia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Faidherbia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Faidherbia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Faidherbia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Faidherbia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::bioclim(bioclim$Faidherbia_albida, p)
+  me_Var[[i]] <-dismo::bioclim(var_spatiale$Faidherbia_albida, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], bioclim$Faidherbia_albida)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_spatiale$Faidherbia_albida)
+  
+}
+bioclimpredFaidherbiabio<-list()
+bioclimpredFaidherbiavar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredFaidherbiabio[[espece[1]]]<-predict(bioclim$Faidherbia_albida, me_bio[[which.max(auc)]])
+bioclimpredFaidherbiabio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFaidherbiabio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFaidherbiabio[["PresenceAbsence"]]<-bioclimpredFaidherbiabio[[espece[1]]]>bioclimpredFaidherbiabio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredFaidherbiavar[[espece[1]]]<-predict(var_spatiale$Faidherbia_albida, me_Var[[which.max(auc)]])
+bioclimpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFaidherbiavar[["PresenceAbsence"]]<-bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]]
+#plot(bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]])
+ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="bioclim appliqué à Faidherbia albida(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(bioclimpredFaidherbiabio[["PresenceAbsence"]],bioclimpredFaidherbiavar[["PresenceAbsence"]])
+```
+
+
+####Balanites
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="bioclim appliqué à Balanites aegyptiaca: (a)= Non ajout;(b)= Oui"}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+names(Base_Balanites_Z)<-c("lon","lat","Balanites")
+for (i in 1:5) {
+  # occtest <- occB[foldB == i, ]
+  # occtrain <- occ[foldB != i, ]
+  train<-Base_Balanites_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Balanites==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Balanites==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Balanites_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Balanites==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Balanites==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::bioclim(bioclim$Balanites_aegyptiaca, p)
+  meB_Var[[i]] <-dismo::bioclim(var_spatiale$Balanites_aegyptiaca, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], bioclim$Balanites_aegyptiaca)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_spatiale$Balanites_aegyptiaca)
+  
+}
+bioclimpredBalanitesbio<-list()
+bioclimpredBalanitesvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredBalanitesbio[[espece[2]]]<-predict(bioclim$Balanites_aegyptiaca, meB_bio[[which.max(auc)]])
+bioclimpredBalanitesbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredBalanitesbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredBalanitesbio[["PresenceAbsence"]]<-bioclimpredBalanitesbio[[espece[2]]]>bioclimpredBalanitesbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredBalanitesvar[[espece[2]]]<-predict(var_spatiale$Balanites_aegyptiaca, meB_Var[[which.max(auc)]])
+bioclimpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredBalanitesvar[["PresenceAbsence"]]<-bioclimpredBalanitesvar[[espece[2]]]>bioclimpredBalanitesvar[["threshold"]]
+#plot(bioclimpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="bioclim appliqué à Balanites(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+
+PASpecies2(bioclimpredBalanitesbio[["PresenceAbsence"]],bioclimpredBalanitesvar[["PresenceAbsence"]])
+```
+
+#### Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAno_bio <- list()
+eAno_Var<-list()
+meAno_bio<-list()
+meAno_Var<-list()
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus")
+for (i in 1:5) {
+  # occtest <- occAno[foldAno == i, ]
+  # occtrain <- occ[foldAno != i, ]
+  train<-Base_Anogeissus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Anogeissus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Anogeissus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Anogeissus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Anogeissus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Anogeissus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAno_bio[[i]] <- dismo::bioclim(bioclim$Anogeissus_leiocarpus, p)
+  meAno_Var[[i]] <- dismo::bioclim(var_spatiale$Anogeissus_leiocarpus, p)
+  eAno_bio[[i]] <- evaluate(occtest, bgtest, meAno_bio[[i]], bioclim$Anogeissus_leiocarpus)
+  eAno_Var[[i]] <- evaluate(occtest, bgtest,  meAno_Var[[i]], var_spatiale$Anogeissus_leiocarpus)
+  
+}
+bioclimpredAnogeissusbio<-list()
+bioclimpredAnogeissusvar<-list()
+auc <- sapply(eAno_bio, function(x){x@auc})
+bioclimpredAnogeissusbio[[espece[3]]]<-predict(bioclim$Anogeissus_leiocarpus, meAno_bio[[which.max(auc)]])
+bioclimpredAnogeissusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredAnogeissusbio[["threshold"]]<- threshold(eAno_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredAnogeissusbio[["PresenceAbsence"]]<-bioclimpredAnogeissusbio[[espece[3]]]>bioclimpredAnogeissusbio[["threshold"]]
+auc <- sapply(eAno_Var, function(x){x@auc})
+bioclimpredAnogeissusvar[[espece[3]]]<-predict(var_spatiale$Anogeissus_leiocarpus, meAno_Var[[which.max(auc)]])
+bioclimpredAnogeissusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredAnogeissusvar[["threshold"]]<- threshold(eAno_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredAnogeissusvar[["PresenceAbsence"]]<-bioclimpredAnogeissusvar[[espece[3]]]>bioclimpredAnogeissusvar[["threshold"]]
+#plot(bioclimpredAnogeissusvar[[espece[2]]]>bioclimpredAnogeissusvar[["threshold"]])
+ggR_Predict2(bioclimpredAnogeissusbio[[espece[3]]],bioclimpredAnogeissusvar[[espece[3]]])
+
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="bioclim appliqué à Anogeissus(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(bioclimpredAnogeissusbio[["PresenceAbsence"]],bioclimpredAnogeissusvar[["PresenceAbsence"]])
+```
+
+
+#### Adansonia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAdan_bio <- list()
+eAdan_Var<-list()
+meAdan_bio<-list()
+meAdan_Var<-list()
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia")
+for (i in 1:5) {
+  # occtest <- occAdan[foldAdan == i, ]
+  # occtrain <- occ[foldAdan != i, ]
+  train<-Base_Adansonia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Adansonia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Adansonia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Adansonia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Adansonia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Adansonia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAdan_bio[[i]] <- dismo::bioclim(bioclim$Adansonia_digitata, p)
+  meAdan_Var[[i]] <- dismo::bioclim(var_spatiale$Adansonia_digitata, p)
+  eAdan_bio[[i]] <- evaluate(occtest, bgtest, meAdan_bio[[i]], bioclim$Adansonia_digitata)
+  eAdan_Var[[i]] <- evaluate(occtest, bgtest,  meAdan_Var[[i]], var_spatiale$Adansonia_digitata)
+  
+}
+bioclimpredAdansoniabio<-list()
+bioclimpredAdansoniavar<-list()
+auc <- sapply(eAdan_bio, function(x){x@auc})
+bioclimpredAdansoniabio[[espece[4]]]<-predict(bioclim$Adansonia_digitata, meAdan_bio[[which.max(auc)]])
+bioclimpredAdansoniabio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredAdansoniabio[["threshold"]]<- threshold(eAdan_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredAdansoniabio[["PresenceAbsence"]]<-bioclimpredAdansoniabio[[espece[4]]]>bioclimpredAdansoniabio[["threshold"]]
+auc <- sapply(eAdan_Var, function(x){x@auc})
+bioclimpredAdansoniavar[[espece[4]]]<-predict(var_spatiale$Adansonia_digitata, meAdan_Var[[which.max(auc)]])
+bioclimpredAdansoniavar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredAdansoniavar[["threshold"]]<- threshold(eAdan_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredAdansoniavar[["PresenceAbsence"]]<-bioclimpredAdansoniavar[[espece[4]]]>bioclimpredAdansoniavar[["threshold"]]
+#plot(bioclimpredAdansoniavar[[espece[4]]]>bioclimpredAdansoniavar[["threshold"]])
+ggR_Predict2(bioclimpredAdansoniabio[[espece[4]]],bioclimpredAdansoniavar[[espece[4]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="bioclim appliqué à Adansonia(Carte de présence absence): (a)= Non ajout;(b)= Oui"}
+PASpecies2(bioclimpredAdansoniabio[["PresenceAbsence"]],bioclimpredAdansoniavar[["PresenceAbsence"]])
+```
+
+
+
+
+
+
+
+#### Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAca_bio <- list()
+eAca_Var<-list()
+meAca_bio<-list()
+meAca_Var<-list()
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Acacia_Z)<-c("lon","lat","Acacia")
+for (i in 1:5) {
+  # occtest <- occAca[foldAca == i, ]
+  # occtrain <- occ[foldAca != i, ]
+  train<-Base_Acacia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Acacia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Acacia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Acacia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Acacia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Acacia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAca_bio[[i]] <- dismo::bioclim(bioclim$Acacia_nilotica, p)
+  meAca_Var[[i]] <- dismo::bioclim(var_spatiale$Acacia_nilotica, p)
+  eAca_bio[[i]] <- evaluate(occtest, bgtest, meAca_bio[[i]], bioclim$Acacia_nilotica)
+  eAca_Var[[i]] <- evaluate(occtest, bgtest,  meAca_Var[[i]], var_spatiale$Acacia_nilotica)
+  
+}
+bioclimpredAcaciabio<-list()
+bioclimpredAcaciavar<-list()
+auc <- sapply(eAca_bio, function(x){x@auc})
+bioclimpredAcaciabio[[espece[5]]]<-predict(bioclim$Acacia_nilotica, meAca_bio[[which.max(auc)]])
+bioclimpredAcaciabio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredAcaciabio[["threshold"]]<- threshold(eAca_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredAcaciabio[["PresenceAbsence"]]<-bioclimpredAcaciabio[[espece[5]]]>bioclimpredAcaciabio[["threshold"]]
+auc <- sapply(eAca_Var, function(x){x@auc})
+bioclimpredAcaciavar[[espece[5]]]<-predict(var_spatiale$Acacia_nilotica, meAca_Var[[which.max(auc)]])
+bioclimpredAcaciavar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredAcaciavar[["threshold"]]<- threshold(eAca_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredAcaciavar[["PresenceAbsence"]]<-bioclimpredAcaciavar[[espece[5]]]>bioclimpredAcaciavar[["threshold"]]
+#plot(bioclimpredAcaciavar[[espece[5]]]>bioclimpredAcaciavar[["threshold"]])
+ggR_Predict2(bioclimpredAcaciabio[[espece[5]]],bioclimpredAcaciavar[[espece[5]]])
+
+```
+
+### Comparaison du modéle de bioclim avec les deux types de variables
+#### AUC
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle sans ajout(Non); Modèle avec ajout(Oui)"}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Faidherbia albida",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Faidherbia albida",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Oui"))
+auc <- sapply(eAno_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Non"))
+auc <- sapply(eAno_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Oui"))
+auc <- sapply(eAdan_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Non"))
+auc <- sapply(eAdan_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Oui"))
+auc <- sapply(eAca_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
+auc <- sapply(eAca_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+p <- ggpaired(Evaluation,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              facet.by = "Espece",
+              short.panel.labs = FALSE)
+# Calcul et ajout des p-values
+p + stat_compare_means(label = "p.signif",
+                       paired = TRUE) # séries appariées => test de Wilcoxon
+
+
+```
+
+
+### Modèle domain
+#### Faidherbia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia")
+for (i in 1:5) {
+  # occtest <- occF[foldF == i, ]
+  # occtrain <- occ[foldF != i, ]
+  train<-Base_Faidherbia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Faidherbia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Faidherbia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Faidherbia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Faidherbia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Faidherbia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  me_bio[[i]] <- dismo::domain(bioclim$Faidherbia_albida, p)
+  me_Var[[i]] <-dismo::domain(var_spatiale$Faidherbia_albida, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], bioclim$Faidherbia_albida)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_spatiale$Faidherbia_albida)
+  
+}
+```
+
+#### Balanites
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+names(Base_Balanites_Z)<-c("lon","lat","Balanites")
+for (i in 1:5) {
+  # occtest <- occB[foldB == i, ]
+  # occtrain <- occ[foldB != i, ]
+  train<-Base_Balanites_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Balanites==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Balanites==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Balanites_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Balanites==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Balanites==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::domain(bioclim$Balanites_aegyptiaca, p)
+  meB_Var[[i]] <-dismo::domain(var_spatiale$Balanites_aegyptiaca, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], bioclim$Balanites_aegyptiaca)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_spatiale$Balanites_aegyptiaca)
+  
+}
+```
+#### Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAno_bio <- list()
+eAno_Var<-list()
+meAno_bio<-list()
+meAno_Var<-list()
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus")
+for (i in 1:5) {
+  # occtest <- occAno[foldAno == i, ]
+  # occtrain <- occ[foldAno != i, ]
+  train<-Base_Anogeissus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Anogeissus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Anogeissus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Anogeissus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Anogeissus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Anogeissus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAno_bio[[i]] <- dismo::domain(bioclim$Anogeissus_leiocarpus, p)
+  meAno_Var[[i]] <- dismo::domain(var_spatiale$Anogeissus_leiocarpus, p)
+  eAno_bio[[i]] <- evaluate(occtest, bgtest, meAno_bio[[i]], bioclim$Anogeissus_leiocarpus)
+  eAno_Var[[i]] <- evaluate(occtest, bgtest,  meAno_Var[[i]], var_spatiale$Anogeissus_leiocarpus)
+  
+}
+
+```
+#### Adansonia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAdan_bio <- list()
+eAdan_Var<-list()
+meAdan_bio<-list()
+meAdan_Var<-list()
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia")
+for (i in 1:5) {
+  # occtest <- occAdan[foldAdan == i, ]
+  # occtrain <- occ[foldAdan != i, ]
+  train<-Base_Adansonia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Adansonia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Adansonia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Adansonia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Adansonia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Adansonia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAdan_bio[[i]] <- dismo::domain(bioclim$Adansonia_digitata, p)
+  meAdan_Var[[i]] <- dismo::domain(var_spatiale$Adansonia_digitata, p)
+  eAdan_bio[[i]] <- evaluate(occtest, bgtest, meAdan_bio[[i]], bioclim$Adansonia_digitata)
+  eAdan_Var[[i]] <- evaluate(occtest, bgtest,  meAdan_Var[[i]], var_spatiale$Adansonia_digitata)
+  
+}
+
+```
+#### Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAca_bio <- list()
+eAca_Var<-list()
+meAca_bio<-list()
+meAca_Var<-list()
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Acacia_Z)<-c("lon","lat","Acacia")
+for (i in 1:5) {
+  # occtest <- occAca[foldAca == i, ]
+  # occtrain <- occ[foldAca != i, ]
+  train<-Base_Acacia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Acacia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Acacia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Acacia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Acacia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Acacia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAca_bio[[i]] <- dismo::domain(bioclim$Acacia_nilotica, p)
+  meAca_Var[[i]] <- dismo::domain(var_spatiale$Acacia_nilotica, p)
+  eAca_bio[[i]] <- evaluate(occtest, bgtest, meAca_bio[[i]], bioclim$Acacia_nilotica)
+  eAca_Var[[i]] <- evaluate(occtest, bgtest,  meAca_Var[[i]], var_spatiale$Acacia_nilotica)
+  
+}
+
+```
+### Comparaison du modéle de domain avec les deux types de variables
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle sans ajout(Non); Modèle avec ajout(Oui)"}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Faidherbia albida",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Faidherbia albida",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Oui"))
+auc <- sapply(eAno_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Non"))
+auc <- sapply(eAno_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Oui"))
+auc <- sapply(eAdan_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Non"))
+auc <- sapply(eAdan_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Oui"))
+auc <- sapply(eAca_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
+auc <- sapply(eAca_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+p <- ggpaired(Evaluation,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              facet.by = "Espece",
+              short.panel.labs = FALSE)
+# Calcul et ajout des p-values
+p + stat_compare_means(label = "p.signif",
+                       paired = TRUE) # séries appariées => test de Wilcoxon
+
+
+```
+
+### Modèle mahal
+#### Faidherbia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia")
+for (i in 1:5) {
+  # occtest <- occF[foldF == i, ]
+  # occtrain <- occ[foldF != i, ]
+  train<-Base_Faidherbia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Faidherbia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Faidherbia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Faidherbia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Faidherbia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Faidherbia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  me_bio[[i]] <- dismo::mahal(bioclim$Faidherbia_albida, p)
+  me_Var[[i]] <-dismo::mahal(var_spatiale$Faidherbia_albida, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], bioclim$Faidherbia_albida)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_spatiale$Faidherbia_albida)
+  
+}
+```
+
+#### Balanites
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+names(Base_Balanites_Z)<-c("lon","lat","Balanites")
+for (i in 1:5) {
+  # occtest <- occB[foldB == i, ]
+  # occtrain <- occ[foldB != i, ]
+  train<-Base_Balanites_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Balanites==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Balanites==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Balanites_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Balanites==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Balanites==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::mahal(bioclim$Balanites_aegyptiaca, p)
+  meB_Var[[i]] <-dismo::mahal(var_spatiale$Balanites_aegyptiaca, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], bioclim$Balanites_aegyptiaca)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_spatiale$Balanites_aegyptiaca)
+  
+}
+```
+#### Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAno_bio <- list()
+eAno_Var<-list()
+meAno_bio<-list()
+meAno_Var<-list()
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus")
+for (i in 1:5) {
+  # occtest <- occAno[foldAno == i, ]
+  # occtrain <- occ[foldAno != i, ]
+  train<-Base_Anogeissus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Anogeissus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Anogeissus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Anogeissus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Anogeissus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Anogeissus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAno_bio[[i]] <- dismo::domain(bioclim$Anogeissus_leiocarpus, p)
+  meAno_Var[[i]] <- dismo::domain(var_spatiale$Anogeissus_leiocarpus, p)
+  eAno_bio[[i]] <- evaluate(occtest, bgtest, meAno_bio[[i]], bioclim$Anogeissus_leiocarpus)
+  eAno_Var[[i]] <- evaluate(occtest, bgtest,  meAno_Var[[i]], var_spatiale$Anogeissus_leiocarpus)
+  
+}
+
+```
+#### Adansonia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAdan_bio <- list()
+eAdan_Var<-list()
+meAdan_bio<-list()
+meAdan_Var<-list()
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia")
+for (i in 1:5) {
+  # occtest <- occAdan[foldAdan == i, ]
+  # occtrain <- occ[foldAdan != i, ]
+  train<-Base_Adansonia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Adansonia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Adansonia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Adansonia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Adansonia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Adansonia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAdan_bio[[i]] <- dismo::mahal(bioclim$Adansonia_digitata, p)
+  meAdan_Var[[i]] <- dismo::mahal(var_spatiale$Adansonia_digitata, p)
+  eAdan_bio[[i]] <- evaluate(occtest, bgtest, meAdan_bio[[i]], bioclim$Adansonia_digitata)
+  eAdan_Var[[i]] <- evaluate(occtest, bgtest,  meAdan_Var[[i]], var_spatiale$Adansonia_digitata)
+  
+}
+
+```
+#### Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eAca_bio <- list()
+eAca_Var<-list()
+meAca_bio<-list()
+meAca_Var<-list()
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Acacia_Z)<-c("lon","lat","Acacia")
+for (i in 1:5) {
+  # occtest <- occAca[foldAca == i, ]
+  # occtrain <- occ[foldAca != i, ]
+  train<-Base_Acacia_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Acacia==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Acacia==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Acacia_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Acacia==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Acacia==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meAca_bio[[i]] <- dismo::mahal(bioclim$Acacia_nilotica, p)
+  meAca_Var[[i]] <- dismo::mahal(var_spatiale$Acacia_nilotica, p)
+  eAca_bio[[i]] <- evaluate(occtest, bgtest, meAca_bio[[i]], bioclim$Acacia_nilotica)
+  eAca_Var[[i]] <- evaluate(occtest, bgtest,  meAca_Var[[i]], var_spatiale$Acacia_nilotica)
+  
+}
+
+```
+### Comparaison du modéle de mahal avec les deux types de variables
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Etude comparative: Modèle sans ajout(Non); Modèle avec ajout(Oui)"}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Faidherbia albida",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Faidherbia albida",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Balanites aegyptiaca",Model="Oui"))
+auc <- sapply(eAno_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Non"))
+auc <- sapply(eAno_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Anogeissus leiocarpus",Model="Oui"))
+auc <- sapply(eAdan_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Non"))
+auc <- sapply(eAdan_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Adansonia digitata",Model="Oui"))
+auc <- sapply(eAca_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
+auc <- sapply(eAca_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+p <- ggpaired(Evaluation,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              facet.by = "Espece",
+              short.panel.labs = FALSE)
+# Calcul et ajout des p-values
+p + stat_compare_means(label = "p.signif",
+                       paired = TRUE) # séries appariées => test de Wilcoxon
+
+
+```
