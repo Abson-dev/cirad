@@ -1,0 +1,2336 @@
+---
+title: "Nioro_2_esp�ces"
+author: "Aboubacar HEMA,ITS4"
+date: "27 juin 2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+########Packages � installer
+# ipak <- function(pkg){
+#   new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+#   if (length(new.pkg)) 
+#     install.packages(new.pkg, dependencies = TRUE)
+#   sapply(pkg, require, character.only = TRUE)
+# }
+# packages <- c("raster", "rasterVis", "RStoolbox","maptools",
+#               "rgdal","spdep","ggspatial","blockCV","randomForest","rJava","dismo",
+#               "ggpubr","funModeling","tidyselect","ggcorrplot",
+#               "adehabitatHS","CENFA")
+# ipak(packages)
+library(tidyverse)
+library(tidyselect)
+library(dplyr)
+library(sf)
+library(raster)
+library(rasterVis)
+library(RStoolbox)
+library(maptools)
+library(rgdal)
+library(spdep)
+library(ggplot2)
+library(ggspatial)
+library(blockCV)
+library(randomForest)
+library(rJava)
+library(dismo)
+library(ggpubr)
+library(questionr)
+library(CENFA)
+############Definitions des fonctions
+reshapePA<-function(Rasterstack,espece){
+  Pred<-list()
+  data<-as.data.frame(Rasterstack)
+  PA<-reshape(data, direction = "long", varying=1:ncol(data),v.names = c("Pred"),times =1:ncol(data) )
+  PA$Species<-rep(espece,each=nrow(data))
+  PA<-PA[,c("Pred","Species")]
+  BaseStat<-as.data.frame(cprop(table(PA)))
+  BaseStat<-BaseStat %>%
+    filter(Pred!="Total") %>%
+    filter(Species!="Ensemble")
+  
+  BaseStat$Freq<-round(BaseStat$Freq,2) 
+  Pred[["Predict table"]]<-BaseStat
+  plot<-ggbarplot(BaseStat,
+                  x = "Species", y = "Freq",
+                  fill = "Pred",
+                  color = "Pred",
+                  legend="top",label=TRUE,lab.pos = "in",ggtheme = theme_bw()) 
+  
+  Pred[["Plot"]]<-plot
+  return(Pred)
+}
+Explorer<-function (blocks, rasterLayer, speciesData, num) {
+  # records<-blocks$records
+  # records$fold<-1:nrow(records)
+  # records <- records[,c(5,1,2,3,4)] %>% 
+  #   mutate(calcul= round((test_0 + test_1)*100/(test_0 + test_1+train_1 + train_0),digits = 0))
+  # records.p <- ggtexttable(records,rows = NULL, theme = ttheme("mGreen"))
+  # 
+  polyObj <- blocks$blocks
+  folds <- blocks$folds
+  kmax <- length(folds)
+  species <- blocks$species
+  speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer[[1]], 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  mid <- stats::median(map_df$MAP)
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                       ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP")) + 
+    ggplot2::scale_fill_gradient2(low = "darkred", mid = "yellow", 
+                                  high = "darkgreen", midpoint = mid) + ggplot2::guides(fill = FALSE) + 
+    ggplot2::theme_bw() + ggplot2::labs(x = "", y = "")
+  trainSet <- unlist(folds[[num]][1])
+  testSet <- unlist(folds[[num]][2])
+  training <- speciesData[trainSet, ]
+  testing <- speciesData[testSet, ]
+  plotPoly <- polyObj[polyObj$folds ==num,]               
+  plotPoly <- sf::st_as_sf(plotPoly)
+  if (is.null(species)) {
+    if (class(blocks) == "SpatialBlock") {
+      ptr <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = training, 
+                                                                        alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = testing, 
+                                                                        alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+    else {
+      ptr <- basePlot + ggplot2::geom_sf(data = training, 
+                                         alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = testing, 
+                                         alpha = 0.7, color = "blue", size = 2) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+  }
+  else {
+    if (class(blocks) == "SpatialBlock") {
+      ptr <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = training, 
+                                                                        ggplot2::aes(color = get(species)), show.legend = "point", 
+                                                                        alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = plotPoly, 
+                                         color = "red", fill = "orangered4", alpha = 0.04, 
+                                         size = 0.2) + ggplot2::geom_sf(data = testing, 
+                                                                        ggplot2::aes(color = get(species)), show.legend = "point", 
+                                                                        alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+    else {
+      ptr <- basePlot + ggplot2::geom_sf(data = training, 
+                                         ggplot2::aes(color = get(species)), show.legend = "point", 
+                                         alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Training set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+      pts <- basePlot + ggplot2::geom_sf(data = testing, 
+                                         ggplot2::aes(color = get(species)), show.legend = "point", 
+                                         alpha = 0.7, size = 2) + ggplot2::labs(color = species) + 
+        ggplot2::ggtitle("Testing set") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+    }
+  }
+  #ptr_pts<-ggpubr::ggarrange(ptr, pts,common.legend = TRUE)
+  #plot(cowplot::plot_grid(ptr, pts))
+  #plot(ggpubr::ggarrange(ptr,records.p, pts))
+  plot(ggpubr::ggarrange(ptr, pts,common.legend = TRUE))
+}
+################end function
+summarise_fold<-function(sb){
+  records<-sb$records
+  records$fold<-1:nrow(records)
+  records <- records[,c(5,1,2,3,4)] %>% 
+    mutate(Pourcentage= round((test_0 + test_1)*100/(test_0 + test_1+train_1 + train_0),digits = 0))
+  plot(ggpubr::ggtexttable(records,rows = NULL, theme = ttheme("mGreen")))
+}
+##########end function
+
+ggR_Predict<-function(RasterLayer){
+  ggR(RasterLayer,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = names(RasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  
+}
+ggR_Predict2<-function(RasterLayer1,RasterLayer2){
+  g1<-ggR(RasterLayer1,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = "(a)") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  g2<-ggR(RasterLayer2,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = "(b)") + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  ggpubr::ggarrange(g1,g2,common.legend=TRUE)
+}
+#### presence absence function
+PASpecies<-function ( rasterLayer){
+  #speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                       ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  # ptr <- basePlot + ggplot2::geom_sf(data = speciesData, 
+  #                                    alpha = 0.7, color = "blue", size = 1) +
+  #   ggplot2::theme_bw() + ggplot2::labs(x = "", y = "") 
+  # # +
+  #   ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  # plot(cowplot::plot_grid(ptr))
+  basePlot<-basePlot + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espèce",labels=c("Absence","Présence"))
+  return(basePlot)
+  
+}
+####
+PASpecies2<-function ( rasterLayer1,rasterLayer2){
+  #speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer1, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot1 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                        ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  basePlot1<-basePlot1 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = "(a)") + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espèce",labels=c("Absence","Présence"))
+  samp <- raster::sampleRegular(rasterLayer2, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot2 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                        ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  basePlot2<-basePlot2 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = "(b)") + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espèce",labels=c("Absence","Présence"))
+  ggpubr::ggarrange(basePlot1,basePlot2,common.legend = TRUE)
+  
+  
+}
+Dist<-function ( rasterLayer, speciesData){
+  speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                       ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP")) + 
+    ggplot2::scale_fill_gradientn(name = "", colours = rev(terrain.colors(10)))
+  ptr <- basePlot + ggplot2::geom_sf(data = speciesData, 
+                                     alpha = 0.7, color = "blue", size = 1) +
+    ggplot2::theme_bw() + ggplot2::labs(x = "", y = "") 
+  # +
+  #   ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  # plot(cowplot::plot_grid(ptr))
+  return(ptr)
+  
+}
+#######"import species
+Recodificateur <- function(data,espece,varying){
+  for (lag_size in espece) {
+    data <- data %>% 
+      dplyr::mutate(!!sym(lag_size) := as.factor(ifelse(varying == lag_size,1,0)))
+  }
+  return(data)
+}
+######construire des bases des espèces choisies
+Base<-function(Species,coord,espece){
+  Species<-st_drop_geometry(Species)
+  data<-list()
+  for (i in 1:length(espece)) {
+    data[[espece[i]]]<-Species[,c(coord[1],coord[2],espece[i])] 
+    # %>% 
+    #   dplyr::select(coord[1],coord[2],espece[i])
+    
+  }
+  return(data)
+}
+
+Selectpredictors<-function(RasterStack,predictors){
+  if(length(predictors)==1){
+    p<- raster::subset(RasterStack,predictors[[1]]) 
+    p<-list(p)
+    names(p)<-names(predictors)
+    return(p)
+  }
+  else{
+    var<-names(predictors)
+    s<-list()
+    
+    p<- raster::subset(RasterStack,predictors[[1]])
+    s[[var[1]]]<-p
+    for (i in 2:length(predictors)) {
+      p<- raster::subset(RasterStack,predictors[[i]])
+      s[[var[i]]]<-p
+    }
+    
+    return (s)
+  }
+  
+  
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+chemin<-"C:\\Users\\Hp\\OneDrive\\cirad\\ParcFaidherbia\\Data\\BD_Arbres"
+#data<-"arbres_diohine_mai2018_par_Zone_OK_BON.shp" # base des arbres du parc � Prosopis africana
+data<-"bd_arbres_nioro.shp"
+data<-paste0("\\",data)
+filename<-paste0(chemin,data)
+#########Importation de la base arbre
+Species<-st_read(filename,quiet = T)
+#Precisez les especes a modeliser
+
+
+
+
+
+espece=c("Prosopis africana","Ficus capensis")
+# espece = c("Prosopis africana","Ficus capensis","Anogeissus leiocarpus",
+#            "Adansonia digitata","Acacia nilotica")
+coord<-c("xcoord","ycoord") #les variables sur la longitude=xcoord et la latitude=ycoord
+#coord<-c("Long","Lat")
+# Species <- Recodificateur(data = Species,espece = espece,varying = Species$Species)
+# Base<-Base(Species,coord,espece)
+Species <- Recodificateur(data = Species,espece = espece,varying = Species$Espece)
+Base<-Base(Species,coord,espece)
+
+#########Importation des Variables sur le Sol
+lsoil<-list.files("F:\\Stage_SDM\\SoilGrids_250m\\",patt="\\.tif")
+lsoil<-sprintf("F:\\Stage_SDM\\SoilGrids_250m\\%s",lsoil)
+#e<-extent(-16.542,-15.70,13.67,14.64)
+e<-extent(-15.89,-15.70,13.68,13.85)
+AETI<-raster(lsoil[1])
+AETI.crop<-crop(AETI,e)
+names(AETI.crop)<-"AETI"
+CLYPPT<-raster(lsoil[2])
+CLYPPT.crop<-crop(CLYPPT,e)
+names(CLYPPT.crop)<-"CLYPPT"
+ORCDRC<-raster(lsoil[3])
+ORCDRC.crop<-crop(ORCDRC,e)
+names(ORCDRC.crop)<-"ORCDRC"
+PHIHOX<-raster(lsoil[4])
+PHIHOX.crop<-crop(PHIHOX,e)
+names(PHIHOX.crop)<-"PHIHOX"
+SLTPPT<-raster(lsoil[5])
+SLTPPT.crop<-crop(SLTPPT,e)
+names(SLTPPT.crop)<-"SLTPPT"
+SNDPPT<-raster(lsoil[6])
+SNDPPT.crop<-crop(SNDPPT,e)
+names(SNDPPT.crop)<-"SNDPPT"
+NTO<-raster(lsoil[7])
+NTO.crop<-crop(NTO,e)
+names(NTO.crop)<-"NTO"
+P<-raster(lsoil[8])
+P.crop<-crop(P,e)
+names(P.crop)<-"P"
+NBWP<-raster(lsoil[9])
+NBWP.crop<-crop(NBWP,e)
+names(NBWP.crop)<-"NBWP"
+SINT<-raster(lsoil[10])
+SINT.crop<-crop(SINT,e)
+names(SINT.crop)<-"SINT"
+SOS<-raster(lsoil[11])
+SOS.crop<-crop(SOS,e)
+names(SOS.crop)<-"SOS"
+
+##################"
+AETI<-projectRaster(AETI.crop,P.crop)
+CLYPPT<-projectRaster(CLYPPT.crop,P.crop)
+#extent(CLYPPT)<-extent(P.crop)
+ORCDRC<-projectRaster(ORCDRC.crop,P.crop)
+#extent(ORCDRC)<-extent(P.crop)
+PHIHOX<-projectRaster(PHIHOX.crop,P.crop)
+fun <- function(x) { x / 10 }
+PHIHOX<-calc(PHIHOX,fun)
+names(PHIHOX)<-"PHIHOX"
+SLTPPT<-projectRaster(SLTPPT.crop,P.crop)
+NTO<-projectRaster(NTO.crop,P.crop)
+SNDPPT<-projectRaster(SNDPPT.crop,P.crop)
+NBWP<-projectRaster(NBWP.crop,P.crop)
+SINT<-projectRaster(SINT.crop,P.crop)
+SOS<-projectRaster(SOS.crop,P.crop)
+P<-P.crop
+
+SoilGrid.crop<-stack(AETI,SINT,SOS,NBWP,CLYPPT,ORCDRC,PHIHOX,SLTPPT,NTO,SNDPPT,P)
+
+###Importation des variables Worlclim
+l1<-list.files("F:\\Stage_SDM\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("F:\\Stage_SDM\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+worldclim<-stack(l1)
+worldclim.crop <- crop(worldclim,e)
+worldclim.crop<-projectRaster(worldclim.crop,P)
+worldclim.crop<-stack(worldclim.crop)
+
+#### Importation des variables topographiques
+# topofilename<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\variables topographiques","\\topo.shp")
+topofilename<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\variables topographiques\\nioro","\\topo_nioro.shp")
+
+topo <- shapefile(topofilename,verbose=TRUE)
+Slo1 <- rasterize(topo, P, field="Slo1")
+#???plot(Slo1)
+names(Slo1)<-"Slo1"
+Len1 <- rasterize(topo, P, field="Len1")
+#plot(Len1)
+names(Len1)<-"Len1"
+#writeRaster(Len1, filename=file.path(tmp, "Len1.tif"), format="GTiff", overwrite=TRUE)
+######
+Sll <- rasterize(topo, P, field="Sll")
+#plot(Sll) # valeur identique
+names(Sll)<-"Sll"
+#writeRaster(Sll, filename=file.path(tmp, "Sll.tif"), format="GTiff", overwrite=TRUE)
+##### 
+Csl <- rasterize(topo, P, field="Csl")
+#plot(Csl)
+names(Csl)<-"Csl"
+#writeRaster(Csl, filename=file.path(tmp, "Csl.tif"), format="GTiff", overwrite=TRUE)
+####
+
+Wid1 <- rasterize(topo, P, field="Wid1")
+#plot(Wid1)
+names(Wid1)<-"Wid1"
+#writeRaster(Wid1, filename=file.path(tmp, "Wid1.tif"), format="GTiff", overwrite=TRUE)
+#############
+Dep1 <- rasterize(topo, P, field="Dep1")
+#plot(Dep1)
+names(Dep1)<-"Dep1"
+#writeRaster(Dep1, filename=file.path(tmp, "Dep1.tif"), format="GTiff", overwrite=TRUE)
+###########
+Elev <- rasterize(topo, P, field="Elev")
+#plot(Elev)
+names(Elev)<-"Elev"
+#writeRaster(Elev, filename=file.path(tmp, "Elev.tif"), format="GTiff", overwrite=TRUE)
+###########
+#Sll
+Vartopo<-stack(Slo1,Len1,Csl,Wid1,Dep1,Elev)
+#???bio14
+worldclim.crop<-dropLayer(worldclim.crop,6)
+Variables<-stack(SoilGrid.crop,worldclim.crop,Vartopo)
+#nlayers(Variables)
+#ENFA_var <- dropLayer(Variables, c(17, 22, 33)) Prosopis africana
+ENFA_var <- Variables
+#pr<- Base[[1]][Base[[1]][,ncol(Base[[1]])] == 1,]
+
+BaseENFA<-function(Species,espece){
+  data<-list()
+  for (i in 1:length(espece)) {
+    data[[espece[i]]]<-Species[[i]][Species[[i]][,ncol(Species[[i]])] == 1,] %>% purrr::set_names("lon","lat",espece[i])
+
+    sp::coordinates(data[[espece[i]]]) <-~lon+lat
+sp::proj4string(data[[espece[i]]]) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+  }
+  return(data)
+}
+BaseENFA<-BaseENFA(Base,espece)
+# ENFASpecies<-function(BaseENFA,espece,ENFA_var){
+#   mod.enfa<-list()
+#   for (i in 1:length(espece)) {
+#    BaseENFA[[i]]@data[[1]]<-as.numeric(BaseENFA[[i]]@data[[1]]) 
+#    mod.enfa[[espece[i]]] <- CENFA::enfa(x = ENFA_var, s.dat = BaseENFA[[i]], field = espece[i])
+#    }
+#   return(mod.enfa)
+# }
+
+# ENFASpecies<-ENFASpecies(BaseENFA,espece,ENFA_var)
+# 
+# ScatterSpecies<-function(ENFASpecies,espece,ENFA_var){
+#   scatter.enfa<-list()
+#   n=nlayers(ENFA_var)
+#   glc <- CENFA::GLcenfa(x = ENFA_var)
+#   for (i in 1:length(espece)){
+#    scatter.enfa[[espece[1]]] <-CENFA::scatter(x = ENFASpecies[[1]], y = glc,n=35,p=1)
+#   }
+#   return(scatter.enfa)
+# }
+# 
+# Scatters<-ScatterSpecies(ENFASpecies,espece,ENFA_var)
+
+########Vous devrer precisez apres ENFA quelles sont les variables qui expliquent chaque especes
+##Indication: les graphes ci-dessous sont affiches en fonction des indices dans la liste espece()
+var_expli<-list()
+var_explibio<-list()
+var_expli[[espece[1]]]<-dropLayer(ENFA_var,c("bio3","bio5","bio7","bio16","bio10","bio18","bio17","bio4","bio12","bio2","bio6","bio15","SLPPT","PHIHOX"))
+var_explibio[[espece[1]]]<-subset(ENFA_var,str_subset(names(var_expli[[1]]),"bio"))
+
+var_expli[[espece[2]]]<-dropLayer(ENFA_var,c("bio3","bio7","bio5","bio3","bio5","bio7","bio9","bio2","CLYPPT","bio12","bio17","bio15","bio6","PHIHOX","SLTPPT","NBWP","Wid1","bio13","bio16"))
+var_explibio[[espece[2]]]<-subset(ENFA_var,str_subset(names(var_expli[[2]]),"bio"))
+
+# names(var_expli[[1]])
+# varexplicat<-data.frame(names(var_expli[[1]]))
+# varex<-data.frame(names(var_expli[[2]]))
+# varia<-cbind(varexplicat,varex)
+
+```
+
+
+```{r}
+glc <- GLcenfa(x = ENFA_var)
+mod.enfa<-list()
+scatter.enfa<-list()
+BaseENFA[[1]]@data[[1]]<-as.numeric(BaseENFA[[1]]@data[[1]]) 
+mod.enfa[[espece[1]]] <- CENFA::enfa(x = ENFA_var, s.dat = BaseENFA[[1]], field = espece[1])
+
+scatter.enfa[[espece[1]]] <-CENFA::scatter(x = mod.enfa[[1]], y = glc,n=35,p=1)
+```
+```{r}
+BaseENFA[[2]]@data[[1]]<-as.numeric(BaseENFA[[2]]@data[[1]]) 
+mod.enfa[[espece[2]]] <- CENFA::enfa(x = ENFA_var, s.dat = BaseENFA[[2]], field = espece[2])
+
+scatter.enfa[[espece[2]]] <-CENFA::scatter(x = mod.enfa[[2]], y = glc,n=35,p=1)
+```
+
+
+
+```{r}
+predic<-dropLayer(ENFA_var,c("bio17"))
+glc <- GLcenfa(x = predic)
+# correlation matrix
+Z <- CENFA::parScale(predic)
+mat <- CENFA::parCov(Z)
+# ggcorrplot::ggcorrplot(mat,ggtheme = ggplot2::theme_gray,
+#            hc.order = TRUE,
+#            type = "lower",
+#            lab = FALSE,
+#            colors = c("#6D9EC1", "white", "#E46726")) 
+Base_Prosopis_Z<-Base$`Prosopis africana`
+pa_dataF <- st_as_sf(Base_Prosopis_Z, coords = c("xcoord","ycoord"), crs = crs(predic))
+Cor <- raster::extract(predic, pa_dataF, df = TRUE)
+Cor<-Cor[,-1]
+# Add correlation significance level
+# --------------------------------
+# Argument p.mat
+# Barring the no significant coefficient
+
+p.mat <- ggcorrplot::cor_pmat(Cor)
+ggcorrplot::ggcorrplot(mat,ggtheme = ggplot2::theme_gray,
+                       hc.order = TRUE,
+                       type = "lower",
+                       p.mat = p.mat,
+                       colors = c("#6D9EC1", "white", "#E46726"))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sac<-spatialAutoRange(rasterLayer = ENFA_var, # raster file
+                      doParallel = T, 
+                      
+                      showPlots = FALSE)
+```
+
+
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sac$plots$barchart
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sac$plots$mapplot
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+pa_data<-list()
+spatialBlock<-list()
+set.seed(1994)
+for(k in 1:length(espece)){
+  pa_data[[espece[k]]]<-st_as_sf(Base[[k]], coords = coord, crs = crs(ENFA_var))
+  
+  spatialBlock[[espece[k]]]<-spatialBlock(speciesData = pa_data[[espece[k]]],
+                                          species = espece[k],
+                                          rasterLayer = ENFA_var,
+                                          theRange = 6481, # size of the blocks
+                                          k = 5,
+                                          showBlocks = TRUE,
+                                          selection = "random",
+                                          iteration = 100, # find evenly dispersed folds
+                                          biomod2Format = FALSE,
+                                          rows = 6,
+                                          cols = 6,
+                                          xOffset = 0, # shift the blocks horizontally
+                                          yOffset = 0)
+}
+```
+
+
+
+
+# Modelisation de la distribution des Especes 
+### Maxent
+#### C. pinnata
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+spatialBlock[[1]]$plots
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Explorer(spatialBlock[[1]], ENFA_var, pa_data$`Prosopis africana`,1)
+```
+
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+summarise_fold(spatialBlock[[1]])
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+folds <- spatialBlock[[1]]$folds
+for (i in 1:5) {trainSet <- unlist(folds[[i]][1]) # training set indices
+testSet <- unlist(folds[[i]][2]) # testing set indices
+train<-Base_Prosopis_Z[trainSet, ] 
+p<-train %>% 
+  filter(Prosopis==1)
+p<-p[,c("lon","lat")]
+a<-train %>% 
+  filter(Prosopis==0)
+a<-a[,c("lon","lat")]
+test<-Base_Prosopis_Z[testSet, ] 
+occtest<-test %>% 
+  filter(Prosopis==1)
+occtest<-occtest[,c("lon","lat")] 
+bgtest<-test %>% 
+  filter(Prosopis==0)
+bgtest<-bgtest[,c("lon","lat")]
+me_bio[[i]] <- dismo::maxent(var_explibio$`Prosopis africana`, p, a) #, factors='Sol'
+me_Var[[i]] <- dismo::maxent(var_expli$`Prosopis africana`, p, a) #, factors='Sol'
+eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+}
+tmpdir<-"C:\\Users\\Hp\\OneDrive\\cirad\\ParcCordyla\\Data\\Sorties\\MaxEnt\\"
+MaxentpredProsopisbio<-list()
+MaxentpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+MaxentpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+writeRaster(MaxentpredProsopisbio[[espece[1]]], filename=file.path(tmpdir, "Prosopisbio.tif"), format="GTiff", overwrite=TRUE)
+MaxentpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+#0.5473986
+MaxentpredProsopisbio[["PresenceAbsence"]]<-MaxentpredProsopisbio[[espece[1]]]>MaxentpredProsopisbio[["threshold"]]
+writeRaster(MaxentpredProsopisbio[["PresenceAbsence"]], filename=file.path(tmpdir, "ProsopisbioPA.tif"), format="GTiff", overwrite=TRUE)
+auc <- sapply(eF_Var, function(x){x@auc})
+MaxentpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+writeRaster(MaxentpredProsopisvar[[espece[1]]], filename=file.path(tmpdir, "Prosopisvar.tif"), format="GTiff", overwrite=TRUE)
+MaxentpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+#0.467388
+MaxentpredProsopisvar[["PresenceAbsence"]]<-MaxentpredProsopisvar[[espece[1]]]>MaxentpredProsopisvar[["threshold"]]
+writeRaster(MaxentpredProsopisvar[["PresenceAbsence"]], filename=file.path(tmpdir, "ProsopisvarPA.tif"), format="GTiff", overwrite=TRUE)
+#plot(MaxentpredProsopisvar[[espece[1]]]>MaxentpredProsopisvar[["threshold"]])
+ggR_Predict2(MaxentpredProsopisbio[[espece[1]]],MaxentpredProsopisvar[[espece[1]]])
+plot(me_Var[[which.max(auc)]], main="Prosopis africana",xlab="Pourcentage(%)") 
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+########response
+response(me_Var[[which.max(auc)]],var=c("ORCDRC","NTO","P"),main="Prosopis africana") 
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#density(eF_Var[[which.max(auc)]])
+boxplot(eF_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[1])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+spatialBlock[[2]]$plots
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summarise_fold(spatialBlock[[2]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Ficus_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- maxent(var_explibio$`Ficus capensis`, p, a) #, factors='Sol'
+  meB_Var[[i]] <- maxent(var_expli$`Ficus capensis`, p, a) #, factors='Sol'
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+MaxentpredFicusbio<-list()
+MaxentpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+MaxentpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+MaxentpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+#0.5897547
+MaxentpredFicusbio[["PresenceAbsence"]]<-MaxentpredFicusbio[[espece[2]]]>MaxentpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+MaxentpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+MaxentpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+#0.4780085
+MaxentpredFicusvar[["PresenceAbsence"]]<-MaxentpredFicusvar[[espece[2]]]>MaxentpredFicusvar[["threshold"]]
+
+writeRaster(MaxentpredFicusbio[[espece[2]]], filename=file.path(tmpdir, "Ficusbio.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredFicusbio[["PresenceAbsence"]], filename=file.path(tmpdir, "FicusbioPA.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredFicusvar[[espece[2]]], filename=file.path(tmpdir, "Ficusvar.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredFicusvar[["PresenceAbsence"]], filename=file.path(tmpdir, "FicusvarPA.tif"), format="GTiff", overwrite=TRUE)
+#plot(MaxentpredProsopisvar[[espece[1]]])
+ggR_Predict2(MaxentpredFicusbio[[espece[2]]],MaxentpredFicusvar[[espece[2]]])
+plot(meB_Var[[which.max(auc)]], main=espece[2],xlab="Pourcentage(%)")
+```
+
+```{r}
+response(meB_Var[[which.max(auc)]],var=c("bio1","bio10","NTO"),main=espece[2])
+```
+
+```{r}
+boxplot(eB_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[2])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"MaxEnt"
+Evaluation$blocs<-"Oui"
+Evaluation<-as.data.frame(Evaluation)
+write.csv2(Evaluation,"EvaluationMaxEnt")
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+```
+
+###bioclim
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+folds<-spatialBlock[[1]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Prosopis_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::bioclim(var_explibio$`Prosopis africana`, p)
+  me_Var[[i]] <-dismo::bioclim(var_expli$`Prosopis africana`, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+  
+}
+bioclimpredProsopisbio<-list()
+bioclimpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+bioclimpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisbio[["PresenceAbsence"]]<-bioclimpredProsopisbio[[espece[1]]]>bioclimpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+bioclimpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisvar[["PresenceAbsence"]]<-bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]])
+ggR_Predict2(bioclimpredProsopisbio[[espece[1]]],bioclimpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Ficus_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::bioclim(var_explibio$`Ficus capensis`, p)
+  meB_Var[[i]] <-dismo::bioclim(var_expli$`Ficus capensis`, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+bioclimpredFicusbio<-list()
+bioclimpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+bioclimpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusbio[["PresenceAbsence"]]<-bioclimpredFicusbio[[espece[2]]]>bioclimpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+bioclimpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusvar[["PresenceAbsence"]]<-bioclimpredFicusvar[[espece[2]]]>bioclimpredFicusvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]])
+ggR_Predict2(bioclimpredFicusbio[[espece[2]]],bioclimpredFicusvar[[espece[2]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"bioclim"
+
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"Evaluationbioclim")
+```
+
+### domain
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+folds<-spatialBlock[[1]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Prosopis_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::domain(var_explibio$`Prosopis africana`, p)
+  me_Var[[i]] <-dismo::domain(var_expli$`Prosopis africana`, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+  
+}
+bioclimpredProsopisbio<-list()
+bioclimpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+bioclimpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisbio[["PresenceAbsence"]]<-bioclimpredProsopisbio[[espece[1]]]>bioclimpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+bioclimpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisvar[["PresenceAbsence"]]<-bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]])
+ggR_Predict2(bioclimpredProsopisbio[[espece[1]]],bioclimpredProsopisvar[[espece[1]]])
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Ficus_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::domain(var_explibio$`Ficus capensis`, p)
+  meB_Var[[i]] <-dismo::domain(var_expli$`Ficus capensis`, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+bioclimpredFicusbio<-list()
+bioclimpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+bioclimpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusbio[["PresenceAbsence"]]<-bioclimpredFicusbio[[espece[2]]]>bioclimpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+bioclimpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusvar[["PresenceAbsence"]]<-bioclimpredFicusvar[[espece[2]]]>bioclimpredFicusvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]])
+# ggR_Predict2(bioclimpredFicusbio[[espece[2]]],bioclimpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"domain"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"Evaluationdomain")
+```
+
+### mahal
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+folds<-spatialBlock[[1]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Prosopis_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::domain(var_explibio$`Prosopis africana`, p)
+  me_Var[[i]] <-dismo::domain(var_expli$`Prosopis africana`, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+  
+}
+bioclimpredProsopisbio<-list()
+bioclimpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+bioclimpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisbio[["PresenceAbsence"]]<-bioclimpredProsopisbio[[espece[1]]]>bioclimpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+bioclimpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisvar[["PresenceAbsence"]]<-bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]])
+ggR_Predict2(bioclimpredProsopisbio[[espece[1]]],bioclimpredProsopisvar[[espece[1]]])
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  train<-Base_Ficus_Z[trainSet, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[testSet, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::mahal(var_explibio$`Ficus capensis`, p)
+  meB_Var[[i]] <-dismo::mahal(var_expli$`Ficus capensis`, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+bioclimpredFicusbio<-list()
+bioclimpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+bioclimpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusbio[["PresenceAbsence"]]<-bioclimpredFicusbio[[espece[2]]]>bioclimpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+bioclimpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusvar[["PresenceAbsence"]]<-bioclimpredFicusvar[[espece[2]]]>bioclimpredFicusvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]])
+# ggR_Predict2(bioclimpredFicusbio[[espece[2]]],bioclimpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"mahal"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"Evaluationmahal")
+
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Base_Prosopis_Z<-Base$`Prosopis africana`
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+pa_dataF <- st_as_sf(Base_Prosopis_Z, coords = c("lon","lat"), crs = crs(var_explibio$`Prosopis africana`))
+pa_dataB <- st_as_sf(Base_Ficus_Z, coords = c("lon","lat"), crs = crs(var_explibio$`Ficus capensis`))
+pa_dataFVar <- st_as_sf(Base_Prosopis_Z, coords = c("lon","lat"), crs = crs(var_expli$`Prosopis africana`))
+pa_dataBVar <- st_as_sf(Base_Ficus_Z, coords = c("lon","lat"), crs = crs(var_expli$`Ficus capensis`))
+################
+# extract the raster values for the species points as a dataframe
+mydataF <- raster::extract(var_explibio$`Prosopis africana`, pa_dataF, df = TRUE)
+#df_status(mydataF)
+mydataB <- raster::extract(var_explibio$`Ficus capensis`, pa_dataB, df = TRUE)
+# adding species column to the dataframe
+mydataF$Prosopis <- as.factor(pa_dataF$Prosopis)
+#mydataF$Sol<-as.factor(mydataF$Sol)
+mydataB$Ficus <- as.factor(pa_dataB$Ficus)
+# remove extra column (ID)
+mydataF <- mydataF[,-1]
+mydataB <- mydataB[,-1]
+
+# extract the raster values for the species points as a dataframe
+mydataFVar <- raster::extract(var_expli$`Prosopis africana`, pa_dataFVar, df = TRUE)
+mydataBVar <- raster::extract(var_expli$`Ficus capensis`, pa_dataBVar, df = TRUE)
+
+mydataFVar$Prosopis<-as.factor(pa_dataFVar$Prosopis)
+mydataBVar$Ficus<-as.factor(pa_dataBVar$Ficus)
+# remove extra column (ID)
+mydataFVar <- mydataFVar[,-1]
+mydataBVar <- mydataBVar[,-1]
+```
+
+
+### RandomForest
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+folds<-spatialBlock[[1]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  testpres <- mydataF[mydataF[testSet,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+  testbackg <- mydataF[mydataF[testSet,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- randomForest(as.numeric(Prosopis)~., mydataF[trainSet, ], na.action=na.omit)
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[testSet,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+  testbackg <- mydataFVar[mydataFVar[testSet,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+  me_Var[[i]] <- randomForest(as.numeric(Prosopis)~., mydataFVar[trainSet, ], na.action=na.omit)
+  eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredProsopisbio<-list()
+RandomForestpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+RandomForestpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisbio[["PresenceAbsence"]]<-RandomForestpredProsopisbio[[espece[1]]]>RandomForestpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+RandomForestpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisvar[["PresenceAbsence"]]<-RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]]
+#plot(RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]])
+ggR_Predict2(RandomForestpredProsopisbio[[espece[1]]],RandomForestpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  testpres <- mydataB[mydataB[testSet,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[testSet,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- randomForest(as.numeric(Ficus)~., mydataB[trainSet, ], na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[testSet,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[testSet,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- randomForest(as.numeric(Ficus)~., mydataBVar[trainSet, ], na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredFicusbio<-list()
+RandomForestpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+RandomForestpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusbio[["PresenceAbsence"]]<-RandomForestpredFicusbio[[espece[2]]]>RandomForestpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+RandomForestpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusvar[["PresenceAbsence"]]<-RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]]
+#plot(RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]])
+ggR_Predict2(RandomForestpredFicusbio[[espece[2]]],RandomForestpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"RF"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"EvaluationRF")
+```
+
+
+### GLM
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+folds<-spatialBlock[[1]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  testpres <- mydataF[mydataF[testSet,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+  testbackg <- mydataF[mydataF[testSet,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- glm(Prosopis~., mydataF[trainSet, ], na.action=na.omit,
+                     family = binomial(link = "logit"))
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[testSet,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+  testbackg <- mydataFVar[mydataFVar[testSet,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+  me_Var[[i]] <- glm(Prosopis~., mydataFVar[trainSet, ],
+                     family = binomial(link = "logit"), na.action=na.omit)
+  eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredProsopisbio<-list()
+RandomForestpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+RandomForestpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisbio[["PresenceAbsence"]]<-RandomForestpredProsopisbio[[espece[1]]]>RandomForestpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+RandomForestpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisvar[["PresenceAbsence"]]<-RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]]
+#plot(RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]])
+ggR_Predict2(RandomForestpredProsopisbio[[espece[1]]],RandomForestpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  testpres <- mydataB[mydataB[testSet,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[testSet,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- glm(Ficus~., mydataB[trainSet, ],family = binomial(link = "logit"), na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[testSet,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[testSet,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- glm(Ficus~., mydataBVar[trainSet, ],family = binomial(link = "logit"), na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredFicusbio<-list()
+RandomForestpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+RandomForestpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusbio[["PresenceAbsence"]]<-RandomForestpredFicusbio[[espece[2]]]>RandomForestpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+RandomForestpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusvar[["PresenceAbsence"]]<-RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]]
+#plot(RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]])
+ggR_Predict2(RandomForestpredFicusbio[[espece[2]]],RandomForestpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+
+Evaluation$Type<-"GLM"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"EvaluationGLM")
+```
+
+
+### SVM
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(kernlab)
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+folds<-spatialBlock[[1]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  testpres <- mydataF[mydataF[testSet,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+  testbackg <- mydataF[mydataF[testSet,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- ksvm(as.numeric(Prosopis)~., mydataF[trainSet, ], na.action=na.omit)
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[testSet,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+  testbackg <- mydataFVar[mydataFVar[testSet,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+  me_Var[[i]] <- ksvm(as.numeric(Prosopis)~., mydataFVar[trainSet, ], na.action=na.omit)
+  eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredProsopisbio<-list()
+RandomForestpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+RandomForestpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisbio[["PresenceAbsence"]]<-RandomForestpredProsopisbio[[espece[1]]]>RandomForestpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+RandomForestpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisvar[["PresenceAbsence"]]<-RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]]
+#plot(RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]])
+ggR_Predict2(RandomForestpredProsopisbio[[espece[1]]],RandomForestpredProsopisvar[[espece[1]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+folds<-spatialBlock[[2]]$folds
+for (i in 1:5) {
+  trainSet <- unlist(folds[[i]][1]) # training set indices
+  testSet <- unlist(folds[[i]][2]) # testing set indices
+  testpres <- mydataB[mydataB[testSet,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[testSet,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- ksvm(as.numeric(Ficus)~., mydataB[trainSet, ], na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[testSet,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[testSet,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- ksvm(as.numeric(Ficus)~., mydataBVar[trainSet, ], na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredFicusbio<-list()
+RandomForestpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+RandomForestpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusbio[["PresenceAbsence"]]<-RandomForestpredFicusbio[[espece[2]]]>RandomForestpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+RandomForestpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusvar[["PresenceAbsence"]]<-RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]]
+#plot(RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]])
+ggR_Predict2(RandomForestpredFicusbio[[espece[2]]],RandomForestpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"SVM"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"EvaluationSVM")
+```
+
+# Modelisation de la distribution des Especes sans les blocs spatiaux
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(1994)
+# witholding a 20% sample for testing 
+fold<-kfold(Base$`Prosopis africana`,5)
+```
+
+### Maxent
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Prosopis_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  me_bio[[i]] <- dismo::maxent(var_explibio$`Prosopis africana`, p, a) #, factors='Sol'
+  me_Var[[i]] <- dismo::maxent(var_expli$`Prosopis africana`, p, a) #, factors='Sol'
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+}
+
+MaxentpredProsopisbio<-list()
+MaxentpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+MaxentpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+MaxentpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredProsopisbio[["PresenceAbsence"]]<-MaxentpredProsopisbio[[espece[1]]]>MaxentpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+MaxentpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+MaxentpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredProsopisvar[["PresenceAbsence"]]<-MaxentpredProsopisvar[[espece[1]]]>MaxentpredProsopisvar[["threshold"]]
+#plot(MaxentpredProsopisvar[[espece[1]]]>MaxentpredProsopisvar[["threshold"]])
+ggR_Predict2(MaxentpredProsopisbio[[espece[1]]],MaxentpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Ficus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- maxent(var_explibio$`Ficus capensis`, p, a) #, factors='Sol'
+  meB_Var[[i]] <- maxent(var_expli$`Ficus capensis`, p, a) #, factors='Sol'
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+MaxentpredFicusbio<-list()
+MaxentpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+MaxentpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+MaxentpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+MaxentpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+MaxentpredFicusbio[["PresenceAbsence"]]<-MaxentpredFicusbio[[espece[2]]]>MaxentpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+MaxentpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+MaxentpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+MaxentpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+MaxentpredFicusvar[["PresenceAbsence"]]<-MaxentpredFicusvar[[espece[2]]]>MaxentpredFicusvar[["threshold"]]
+#plot(MaxentpredProsopisvar[[espece[1]]])
+ggR_Predict2(MaxentpredFicusbio[[espece[2]]],MaxentpredFicusvar[[espece[2]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"MaxEnt"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"EvaluationMaxEnt2")
+```
+
+
+###bioclim
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Prosopis_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::bioclim(var_explibio$`Prosopis africana`, p)
+  me_Var[[i]] <-dismo::bioclim(var_expli$`Prosopis africana`, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+  
+}
+bioclimpredProsopisbio<-list()
+bioclimpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+bioclimpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisbio[["PresenceAbsence"]]<-bioclimpredProsopisbio[[espece[1]]]>bioclimpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+bioclimpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisvar[["PresenceAbsence"]]<-bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]])
+ggR_Predict2(bioclimpredProsopisbio[[espece[1]]],bioclimpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Ficus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::bioclim(var_explibio$`Ficus capensis`, p)
+  meB_Var[[i]] <-dismo::bioclim(var_expli$`Ficus capensis`, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+bioclimpredFicusbio<-list()
+bioclimpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+bioclimpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusbio[["PresenceAbsence"]]<-bioclimpredFicusbio[[espece[2]]]>bioclimpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+bioclimpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusvar[["PresenceAbsence"]]<-bioclimpredFicusvar[[espece[2]]]>bioclimpredFicusvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]])
+ggR_Predict2(bioclimpredFicusbio[[espece[2]]],bioclimpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"bioclim"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationbioclim2")
+```
+
+
+### domain
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Prosopis_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::domain(var_explibio$`Prosopis africana`, p)
+  me_Var[[i]] <-dismo::domain(var_expli$`Prosopis africana`, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+  
+}
+bioclimpredProsopisbio<-list()
+bioclimpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+bioclimpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisbio[["PresenceAbsence"]]<-bioclimpredProsopisbio[[espece[1]]]>bioclimpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+bioclimpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisvar[["PresenceAbsence"]]<-bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]])
+ggR_Predict2(bioclimpredProsopisbio[[espece[1]]],bioclimpredProsopisvar[[espece[1]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Ficus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::domain(var_explibio$`Ficus capensis`, p)
+  meB_Var[[i]] <-dismo::domain(var_expli$`Ficus capensis`, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+bioclimpredFicusbio<-list()
+bioclimpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+bioclimpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusbio[["PresenceAbsence"]]<-bioclimpredFicusbio[[espece[2]]]>bioclimpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+bioclimpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusvar[["PresenceAbsence"]]<-bioclimpredFicusvar[[espece[2]]]>bioclimpredFicusvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]])
+ggR_Predict2(bioclimpredFicusbio[[espece[2]]],bioclimpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"domain"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationdomain2")
+```
+
+### mahal
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+Base_Prosopis_Z<-Base$`Prosopis africana`
+names(Base_Prosopis_Z)<-c("lon","lat","Prosopis")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Prosopis_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Prosopis==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Prosopis==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Prosopis_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Prosopis==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Prosopis==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  
+  me_bio[[i]] <- dismo::mahal(var_explibio$`Prosopis africana`, p)
+  me_Var[[i]] <-dismo::mahal(var_expli$`Prosopis africana`, p)
+  eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Prosopis africana`)
+  eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Prosopis africana`)
+  
+}
+bioclimpredProsopisbio<-list()
+bioclimpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+bioclimpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+bioclimpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisbio[["PresenceAbsence"]]<-bioclimpredProsopisbio[[espece[1]]]>bioclimpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+bioclimpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+bioclimpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredProsopisvar[["PresenceAbsence"]]<-bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]]>bioclimpredProsopisvar[["threshold"]])
+ggR_Predict2(bioclimpredProsopisbio[[espece[1]]],bioclimpredProsopisvar[[espece[1]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+Base_Ficus_Z<-Base$`Ficus capensis`
+names(Base_Ficus_Z)<-c("lon","lat","Ficus")
+
+for (i in 1:5) {
+  
+  
+  train<-Base_Ficus_Z[fold != i, ] 
+  p<-train %>% 
+    filter(Ficus==1)
+  p<-p[,c("lon","lat")]
+  a<-train %>% 
+    filter(Ficus==0)
+  a<-a[,c("lon","lat")]
+  test<-Base_Ficus_Z[fold == i, ] 
+  occtest<-test %>% 
+    filter(Ficus==1)
+  occtest<-occtest[,c("lon","lat")] 
+  bgtest<-test %>% 
+    filter(Ficus==0)
+  bgtest<-bgtest[,c("lon","lat")]
+  meB_bio[[i]] <- dismo::mahal(var_explibio$`Ficus capensis`, p)
+  meB_Var[[i]] <-dismo::mahal(var_expli$`Ficus capensis`, p)
+  eB_bio[[i]] <- evaluate(occtest, bgtest, meB_bio[[i]], var_explibio$`Ficus capensis`)
+  eB_Var[[i]] <- evaluate(occtest, bgtest,  meB_Var[[i]], var_expli$`Ficus capensis`)
+  
+}
+bioclimpredFicusbio<-list()
+bioclimpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+bioclimpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+bioclimpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusbio[["PresenceAbsence"]]<-bioclimpredFicusbio[[espece[2]]]>bioclimpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+bioclimpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+bioclimpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+bioclimpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+bioclimpredFicusvar[["PresenceAbsence"]]<-bioclimpredFicusvar[[espece[2]]]>bioclimpredFicusvar[["threshold"]]
+#plot(bioclimpredProsopisvar[[espece[1]]])
+ggR_Predict2(bioclimpredFicusbio[[espece[2]]],bioclimpredFicusvar[[espece[2]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"mahal"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationmahal2")
+```
+
+
+### RandomForest
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+
+for (i in 1:5) {
+  
+  
+  testpres <- mydataF[mydataF[fold == i,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+  testbackg <- mydataF[mydataF[fold == i,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- randomForest(as.numeric(Prosopis)~., mydataF[fold != i, ], na.action=na.omit)
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+  testbackg <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+  me_Var[[i]] <- randomForest(as.numeric(Prosopis)~., mydataFVar[fold != i, ], na.action=na.omit)
+  eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredProsopisbio<-list()
+RandomForestpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+RandomForestpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisbio[["PresenceAbsence"]]<-RandomForestpredProsopisbio[[espece[1]]]>RandomForestpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+RandomForestpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisvar[["PresenceAbsence"]]<-RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]]
+#plot(RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]])
+ggR_Predict2(RandomForestpredProsopisbio[[espece[1]]],RandomForestpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+
+for (i in 1:5) {
+  
+  
+  testpres <- mydataB[mydataB[fold == i,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[fold == i,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- randomForest(as.numeric(Ficus)~., mydataB[fold != i, ], na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- randomForest(as.numeric(Ficus)~., mydataBVar[fold != i, ], na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredFicusbio<-list()
+RandomForestpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+RandomForestpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusbio[["PresenceAbsence"]]<-RandomForestpredFicusbio[[espece[2]]]>RandomForestpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+RandomForestpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusvar[["PresenceAbsence"]]<-RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]]
+#plot(RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]])
+ggR_Predict2(RandomForestpredFicusbio[[espece[2]]],RandomForestpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"RF"
+Evaluation$blocs<-"Non"
+write_csv2(Evaluation,"EvaluationRF2")
+```
+
+### GLM
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+
+for (i in 1:5) {
+  
+  
+  testpres <- mydataF[mydataF[fold == i,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+  testbackg <- mydataF[mydataF[fold == i,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- glm(Prosopis~., mydataF[fold != i, ], na.action=na.omit,
+                     family = binomial(link = "logit"))
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+  testbackg <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+  me_Var[[i]] <- glm(Prosopis~., mydataFVar[fold != i, ],
+                     family = binomial(link = "logit"), na.action=na.omit)
+  eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredProsopisbio<-list()
+RandomForestpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+RandomForestpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisbio[["PresenceAbsence"]]<-RandomForestpredProsopisbio[[espece[1]]]>RandomForestpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+RandomForestpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisvar[["PresenceAbsence"]]<-RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]]
+#plot(RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]])
+ggR_Predict2(RandomForestpredProsopisbio[[espece[1]]],RandomForestpredProsopisvar[[espece[1]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+
+for (i in 1:5) {
+  
+  
+  testpres <- mydataB[mydataB[fold == i,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[fold == i,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- glm(Ficus~., mydataB[fold != i, ],family = binomial(link = "logit"), na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- glm(Ficus~., mydataBVar[fold != i, ],family = binomial(link = "logit"), na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredFicusbio<-list()
+RandomForestpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+RandomForestpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusbio[["PresenceAbsence"]]<-RandomForestpredFicusbio[[espece[2]]]>RandomForestpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+RandomForestpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusvar[["PresenceAbsence"]]<-RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]]
+#plot(RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]])
+ggR_Predict2(RandomForestpredFicusbio[[espece[2]]],RandomForestpredFicusvar[[espece[2]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"GLM"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationglm2")
+```
+
+### SVM
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eF_bio <- list()
+eF_Var<-list()
+me_bio<-list()
+me_Var<-list()
+
+for (i in 1:5) {
+  
+  
+  testpres <- mydataF[mydataF[fold == i,ncol(mydataF)] == 1, 1:(ncol(mydataF)-1)]
+  testbackg <- mydataF[mydataF[fold == i,ncol(mydataF)] == 0, 1:(ncol(mydataF)-1)]
+  me_bio[[i]] <- ksvm(as.numeric(Prosopis)~., mydataF[fold != i, ], na.action=na.omit)
+  eF_bio[[i]] <- dismo::evaluate(testpres, testbackg, me_bio[[i]])
+  testpres <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 1, 1:ncol(mydataFVar)-1]
+  testbackg <- mydataFVar[mydataFVar[fold == i,ncol(mydataFVar)] == 0, 1:ncol(mydataFVar)-1]
+  me_Var[[i]] <- ksvm(as.numeric(Prosopis)~., mydataFVar[fold != i, ], na.action=na.omit)
+  eF_Var[[i]] <- dismo::evaluate(testpres, testbackg, me_Var[[i]])
+}
+RandomForestpredProsopisbio<-list()
+RandomForestpredProsopisvar<-list()
+auc <- sapply(eF_bio, function(x){x@auc})
+RandomForestpredProsopisbio[[espece[1]]]<-predict(var_explibio$`Prosopis africana`, me_bio[[which.max(auc)]])
+RandomForestpredProsopisbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisbio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisbio[["PresenceAbsence"]]<-RandomForestpredProsopisbio[[espece[1]]]>RandomForestpredProsopisbio[["threshold"]]
+auc <- sapply(eF_Var, function(x){x@auc})
+RandomForestpredProsopisvar[[espece[1]]]<-predict(var_expli$`Prosopis africana`, me_Var[[which.max(auc)]])
+RandomForestpredProsopisvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredProsopisvar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredProsopisvar[["PresenceAbsence"]]<-RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]]
+#plot(RandomForestpredProsopisvar[[espece[1]]]>RandomForestpredProsopisvar[["threshold"]])
+ggR_Predict2(RandomForestpredProsopisbio[[espece[1]]],RandomForestpredProsopisvar[[espece[1]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+eB_bio <- list()
+eB_Var<-list()
+meB_bio<-list()
+meB_Var<-list()
+
+for (i in 1:5) {
+  
+  
+  testpres <- mydataB[mydataB[fold == i,ncol(mydataB)] == 1, 1:(ncol(mydataB)-1)]
+  testbackg <- mydataB[mydataB[fold == i,ncol(mydataB)] == 0, 1:(ncol(mydataB)-1)]
+  meB_bio[[i]] <- ksvm(as.numeric(Ficus)~., mydataB[fold != i, ], na.action=na.omit)
+  eB_bio[[i]] <- dismo::evaluate(testpres, testbackg, meB_bio[[i]])
+  testpres <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 1, 1:ncol(mydataBVar)-1]
+  testbackg <- mydataBVar[mydataBVar[fold == i,ncol(mydataBVar)] == 0, 1:ncol(mydataBVar)-1]
+  meB_Var[[i]] <- ksvm(as.numeric(Ficus)~., mydataBVar[fold != i, ], na.action=na.omit)
+  eB_Var[[i]] <- dismo::evaluate(testpres, testbackg, meB_Var[[i]])
+}
+RandomForestpredFicusbio<-list()
+RandomForestpredFicusvar<-list()
+auc <- sapply(eB_bio, function(x){x@auc})
+RandomForestpredFicusbio[[espece[2]]]<-predict(var_explibio$`Ficus capensis`, meB_bio[[which.max(auc)]])
+RandomForestpredFicusbio[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusbio[["PresenceAbsence"]]<-RandomForestpredFicusbio[[espece[2]]]>RandomForestpredFicusbio[["threshold"]]
+auc <- sapply(eB_Var, function(x){x@auc})
+RandomForestpredFicusvar[[espece[2]]]<-predict(var_expli$`Ficus capensis`, meB_Var[[which.max(auc)]])
+RandomForestpredFicusvar[["AUC"]]<-auc[which.max(auc)]
+RandomForestpredFicusvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+RandomForestpredFicusvar[["PresenceAbsence"]]<-RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]]
+#plot(RandomForestpredFicusvar[[espece[2]]]>RandomForestpredFicusvar[["threshold"]])
+ggR_Predict2(RandomForestpredFicusbio[[espece[2]]],RandomForestpredFicusvar[[espece[2]]])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-data.frame(Echantillon=1:5,AUC=0,Espece="Prosopis africana",Model="Non")
+auc <- sapply(eF_bio, function(x){x@auc})
+Evaluation$AUC<-auc
+auc <- sapply(eF_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Prosopis africana",Model="Oui"))
+auc <- sapply(eB_bio, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Non"))
+auc <- sapply(eB_Var, function(x){x@auc})
+Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Ficus capensis",Model="Oui"))
+Evaluation$Type<-"SVM"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"EvaluationSVM2")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+l1<-list.files("C:/Users/Hp/OneDrive/cirad/ParcProsopis/Data/Sorties/")
+l1<-sprintf("C:/Users/Hp/OneDrive/cirad/ParcProsopis/Data/Sorties/%s",l1)
+Evaluation<- read.csv2(l1[1])
+Evaluation<-Evaluation[,2:ncol(Evaluation)]
+for (i in 2:(length(l1)-1)) {
+  Evaluation1<- read.csv2(l1[i])
+  Evaluation1<-Evaluation1[,2:ncol(Evaluation1)]
+  Evaluation<-rbind(Evaluation,Evaluation1)
+}
+table(Evaluation$Espece)
+write.csv2(Evaluation,"C:/Users/Hp/OneDrive/cirad/ParcProsopis/Data/Sorties/Evaluation")
+Evaluation<-read.csv2("C:/Users/Hp/OneDrive/cirad/ParcProsopis/Data/Sorties/Evaluation")
+Evaluation<-Evaluation[,2:ncol(Evaluation)]  
+Evaluation$Espece<-plyr::revalue(Evaluation$Espece,c("Prosopis africana"="C. pinnata","Ficus capensis"="A. indica "))
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-read.csv2("C:/Users/Hp/OneDrive/cirad/ParcFaidherbia/Data/Sorties/Evaluation")
+Evaluation<-Evaluation[,2:ncol(Evaluation)] 
+Evaluation2<-read.csv2("C:/Users/Hp/OneDrive/cirad/ParcProsopis/Data/Sorties/Evaluation")
+Evaluation2<-Evaluation2[,2:ncol(Evaluation2)]
+Evaluation<-rbind(Evaluation,Evaluation2)
+write.csv2(Evaluation,"C:/Users/Hp/OneDrive/cirad/EvaluationModeles")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Evaluation<-read.csv2("C:/Users/Hp/OneDrive/cirad/EvaluationModeles")
+Evaluation<-Evaluation[,2:ncol(Evaluation)]
+Evaluation$blocs<-plyr::revalue(Evaluation$blocs,c("Oui"="Avec blocs","Non"="Sans blocs"))
+EvaluationF<-Evaluation %>% 
+  dplyr::filter(Espece=="F. albida")
+p <- ggpaired(EvaluationF,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+EvaluationB<-Evaluation %>% 
+  dplyr::filter(Espece=="B. aegyptiaca")
+p <- ggpaired(EvaluationB,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+EvaluationA<-Evaluation %>% 
+  dplyr::filter(Espece=="A. leiocarpus")
+p <- ggpaired(EvaluationA,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+EvaluationAd<-Evaluation %>% 
+  dplyr::filter(Espece=="A. digitata")
+p <- ggpaired(EvaluationAd,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+EvaluationAn<-Evaluation %>% 
+  dplyr::filter(Espece=="A. nilotica")
+p <- ggpaired(EvaluationAn,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+EvaluationC<-Evaluation %>% 
+  dplyr::filter(Espece=="C. pinnata")
+p <- ggpaired(EvaluationC,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+EvaluationAi<-Evaluation %>% 
+  dplyr::filter(Espece=="Ficus capensis")
+View(EvaluationAi)
+p <- ggpaired(EvaluationAi,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# set.seed(1994)
+# # witholding a 20% sample for testing 
+# fold<-kfold(Base[[1]],5)
+# #Maxent
+# evaluateMaxent_bio <- list()
+# evaluateMaxent_Var<-list()
+# Maxent_bio<-list()
+# Maxent_Var<-list()
+# Maxentpred_bio<-list()
+# Maxentpred_Var<-list()
+# for (i in 1:length(espece)){
+#   for (k in 1:5){
+#    p<-Base[[i]][Base[[i]][fold != k,ncol(Base[[i]])] == 1, 1:(ncol(Base[[i]])-1)] #presence train
+#    a<-Base[[i]][Base[[i]][fold != k,ncol(Base[[i]])] == 0, 1:(ncol(Base[[i]])-1)] #absence train
+#    
+#    occtest<-Base[[i]][Base[[i]][fold == k,ncol(Base[[i]])] == 1, 1:(ncol(Base[[i]])-1)] #presence test
+#    bgtest<-Base[[i]][Base[[i]][fold == k,ncol(Base[[i]])] == 0, 1:(ncol(Base[[i]])-1)] #absence test
+#    
+#    ###Model
+#    Maxent_bio[[k]] <- dismo::maxent(var_explibio[[i]], p, a) 
+#   Maxent_Var[[k]] <- dismo::maxent(var_expli[[i]], p, a)
+#   evaluateMaxent_bio[[k]] <- dismo::evaluate(occtest, bgtest, Maxent_bio[[k]], var_explibio[[i]])
+#   evaluateMaxent_Var[[k]] <- dismo::evaluate(occtest, bgtest,  Maxent_Var[[k]], var_expli[[i]])
+#    
+#   }
+#   auc <- sapply(evaluateMaxent_bio, function(x){x@auc})
+#   Maxentpred_bio[[espece[i]]]<-predict(var_explibio[[i]], Maxent_bio[[which.max(auc)]])
+#   AUC_espece<-paste0("AUC",espece[i])
+#   Maxentpred_bio[[AUC_espece]]<-auc[which.max(auc)]
+#   threshold_espece<-paste0("threshold",espece[i])
+#   Maxentpred_bio[[threshold_espece]]<- threshold(evaluateMaxent_bio[[which.max(auc)]], 'spec_sens')
+#   PresenceAbsence_espece<-paste0("PresenceAbsence",espece[i])
+#   Maxentpred_bio[[PresenceAbsence_espece]]<-Maxentpred_bio[[espece[i]]]>Maxentpred_bio[[threshold_espece]]
+#   ###
+#   auc <- sapply(evaluateMaxent_Var, function(x){x@auc})
+#   Maxentpred_Var[[espece[i]]]<-predict(var_expli[[i]], Maxent_Var[[which.max(auc)]])
+#   #AUC_espece<-paste0("AUC",espece[i])
+#   Maxentpred_Var[[AUC_espece]]<-auc[which.max(auc)]
+#   #threshold_espece<-paste0("threshold",espece[i])
+#   Maxentpred_Var[[threshold_espece]]<- threshold(evaluateMaxent_Var[[which.max(auc)]], 'spec_sens')
+#   #PresenceAbsence_espece<-paste0("PresenceAbsence",espece[i])
+#   Maxentpred_Var[[PresenceAbsence_espece]]<-Maxentpred_Var[[espece[i]]]>Maxentpred_Var[[threshold_espece]]
+# }
+# ggR_Predict2(Maxentpred_bio[[espece[1]]],Maxentpred_Var[[espece[1]]])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# CNFASpecies<-function(BaseENFA,espece,ENFA_var){
+#   mod.cnfa<-list()
+#   for (i in 1:length(espece)) {
+#    BaseENFA[[i]]@data[[1]]<-as.numeric(BaseENFA[[i]]@data[[1]]) 
+#    mod.cnfa[[espece[i]]] <- CENFA::cnfa(x = ENFA_var, s.dat = BaseENFA[[i]], field = espece[i])
+#    #s.mapAca <- sensitivity_map(mod.cnfa[[espece[i]]])
+#   }
+#   return(mod.cnfa)
+# }
+# 
+# CNFASpecies<-CNFASpecies(BaseENFA,espece,ENFA_var)
+# sensitivity_mapSpecies<-function(CNFASpecies,espece){
+#   s.map<-list()
+#   for (i in 1:length(espece)) {
+#     s.map[[espece[i]]] <- sensitivity_map(CNFASpecies[[espece[i]]])
+#   }
+#   return(s.map)
+# }
+# 
+# sensitivity_mapSpecies<-sensitivity_mapSpecies(CNFASpecies,espece)
+```
+
+
+

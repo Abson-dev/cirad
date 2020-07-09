@@ -15,21 +15,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Installation des packages
 
 
-ipak <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-  if (length(new.pkg)) 
-    install.packages(new.pkg, dependencies = TRUE)
-  sapply(pkg, require, character.only = TRUE)
-}
-packages <- c("raster", "rasterVis", "RStoolbox","maptools",
-              "rgdal","spdep","ggspatial","blockCV","randomForest","rJava","dismo",
-              "ggpubr","funModeling","tidyselect","ggcorrplot",
-              "adehabitatHS","CENFA")
-ipak(packages)
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(tidyselect)
-#library(SDMSelect)
 library(dplyr)
 library(sf)
 library(raster)
@@ -330,6 +319,7 @@ e<-extent(-16.542,-16.348,14.45,14.64)
 Traitement des données
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 AETI<-raster(lsoil[1])
+names(AETI)<-"AETI"
 AETI.crop<-crop(AETI,e)
 names(AETI.crop)<-"AETI"
 CLYPPT<-raster(lsoil[2])
@@ -339,6 +329,7 @@ ORCDRC<-raster(lsoil[3])
 ORCDRC.crop<-crop(ORCDRC,e)
 names(ORCDRC.crop)<-"ORCDRC"
 PHIHOX<-raster(lsoil[4])
+names(PHIHOX)<-"PHIHOX"
 PHIHOX.crop<-crop(PHIHOX,e)
 names(PHIHOX.crop)<-"PHIHOX"
 SLTPPT<-raster(lsoil[5])
@@ -354,12 +345,15 @@ P<-raster(lsoil[8])
 P.crop<-crop(P,e)
 names(P.crop)<-"P"
 NBWP<-raster(lsoil[9])
+names(NBWP)<-"NBWP"
 NBWP.crop<-crop(NBWP,e)
 names(NBWP.crop)<-"NBWP"
 SINT<-raster(lsoil[10])
+names(SINT)<-"SINT"
 SINT.crop<-crop(SINT,e)
 names(SINT.crop)<-"SINT"
 SOS<-raster(lsoil[11])
+names(SOS)<-"SOS"
 SOS.crop<-crop(SOS,e)
 names(SOS.crop)<-"SOS"
 
@@ -492,6 +486,7 @@ ENFA_var <- dropLayer(Variables, c(17, 22, 33))
 ```
 ## Constitution des bases de présence des espèces
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
+
 Base_Faidherbia_Z<-Base$`Faidherbia albida`
 names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia.albida")
 FaidherbiaPr<- Base_Faidherbia_Z %>%

@@ -196,7 +196,7 @@ PASpecies<-function ( rasterLayer){
   # # +
   #   ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
   # plot(cowplot::plot_grid(ptr))
-  basePlot<-basePlot + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="EspÃ¨ce",labels=c("Absence","PrÃ©sence"))
+  basePlot<-basePlot + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="Espece",labels=c("Absence","Presence"))
   return(basePlot)
   
 }
@@ -298,8 +298,8 @@ coord<-list()
 coord<-c("xcoord","ycoord") #les variables sur la longitude=xcoord et la latitude=ycoord
 Base<-Base(Species,coord,espece)
 
-lsoil<-list.files("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\",patt="\\.tif")
-lsoil<-sprintf("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\%s",lsoil)
+lsoil<-list.files("F:\\Stage_SDM\\SoilGrids_250m\\",patt="\\.tif")
+lsoil<-sprintf("F:\\Stage_SDM\\SoilGrids_250m\\%s",lsoil)
 
 e<-extent(-16.542,-16.348,14.45,14.64)
 
@@ -358,8 +358,8 @@ P<-P.crop
 SoilGrid.crop<-stack(AETI,SINT,SOS,NBWP,CLYPPT,ORCDRC,PHIHOX,SLTPPT,NTO,SNDPPT,P)
 
 ###########
-l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
-l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+l1<-list.files("F:\\Stage_SDM\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("F:\\Stage_SDM\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 worldclim<-stack(l1)
 worldclim.crop <- crop(worldclim,e)
 worldclim.crop<-projectRaster(worldclim.crop,P)
@@ -610,7 +610,7 @@ for(k in 1:length(espece)){
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-#summarise_fold(spatialBlock[[3]]$plots)
+summarise_fold(spatialBlock[[1]])
 
 ```
 
@@ -620,6 +620,10 @@ for(k in 1:length(espece)){
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Faidherbia albida blocs"}
 spatialBlock[[1]]$plots
+```
+
+```{r}
+Explorer(spatialBlock[[1]], ENFA_var, pa_data$`Faidherbia albida`,1)
 ```
 
 
@@ -635,8 +639,7 @@ me_Var<-list()
 Base_Faidherbia_Z<-Base$`Faidherbia albida`
 names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia")
 folds <- spatialBlock[[1]]$folds
-for (i in 1:5) {
-  trainSet <- unlist(folds[[i]][1]) # training set indices
+for (i in 1:5) {trainSet <- unlist(folds[[i]][1]) # training set indices
 testSet <- unlist(folds[[i]][2]) # testing set indices
   train<-Base_Faidherbia_Z[trainSet, ] 
   p<-train %>% 
@@ -657,25 +660,44 @@ testSet <- unlist(folds[[i]][2]) # testing set indices
   eF_bio[[i]] <- dismo::evaluate(occtest, bgtest, me_bio[[i]], var_explibio$`Faidherbia albida`)
   eF_Var[[i]] <- dismo::evaluate(occtest, bgtest,  me_Var[[i]], var_expli$`Faidherbia albida`)
 }
-
+tmpdir<-"C:\\Users\\Hp\\OneDrive\\cirad\\ParcFaidherbia\\Data\\Sorties\\MaxEnt\\"
 MaxentpredFaidherbiabio<-list()
 MaxentpredFaidherbiavar<-list()
 auc <- sapply(eF_bio, function(x){x@auc})
 MaxentpredFaidherbiabio[[espece[1]]]<-predict(var_explibio$`Faidherbia albida`, me_bio[[which.max(auc)]])
+writeRaster(MaxentpredFaidherbiabio[[espece[1]]], filename=file.path(tmpdir, "Faidherbiabio.tif"), format="GTiff", overwrite=TRUE)
 MaxentpredFaidherbiabio[["AUC"]]<-auc[which.max(auc)]
 MaxentpredFaidherbiabio[["threshold"]]<- threshold(eF_bio[[which.max(auc)]], 'spec_sens')
+#0.6273838
 MaxentpredFaidherbiabio[["PresenceAbsence"]]<-MaxentpredFaidherbiabio[[espece[1]]]>MaxentpredFaidherbiabio[["threshold"]]
+writeRaster(MaxentpredFaidherbiabio[["PresenceAbsence"]], filename=file.path(tmpdir, "FaidherbiabioPA.tif"), format="GTiff", overwrite=TRUE)
 auc <- sapply(eF_Var, function(x){x@auc})
 MaxentpredFaidherbiavar[[espece[1]]]<-predict(var_expli$`Faidherbia albida`, me_Var[[which.max(auc)]])
+writeRaster(MaxentpredFaidherbiavar[[espece[1]]], filename=file.path(tmpdir, "Faidherbiavar.tif"), format="GTiff", overwrite=TRUE)
 MaxentpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
+#0.5965889
 MaxentpredFaidherbiavar[["PresenceAbsence"]]<-MaxentpredFaidherbiavar[[espece[1]]]>MaxentpredFaidherbiavar[["threshold"]]
+writeRaster(MaxentpredFaidherbiavar[["PresenceAbsence"]], filename=file.path(tmpdir, "FaidherbiavarPA.tif"), format="GTiff", overwrite=TRUE)
 #plot(MaxentpredFaidherbiavar[[espece[1]]]>MaxentpredFaidherbiavar[["threshold"]])
-# ggR_Predict2(MaxentpredFaidherbiabio[[espece[1]]],MaxentpredFaidherbiavar[[espece[1]]])
+ ggR_Predict2(MaxentpredFaidherbiabio[[espece[1]]],MaxentpredFaidherbiavar[[espece[1]]])
+```
+
+
+```{r}
+plot(me_Var[[which.max(auc)]], main=espece[1],xlab="Pourcentage(%)")
+```
+
+```{r}
+response(me_Var[[which.max(auc)]],var=c("bio5","CLYPPT","bio18"),main=espece[1])
+```
+
+```{r}
+boxplot(eF_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[1])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredFaidherbiabio[["PresenceAbsence"]],MaxentpredFaidherbiavar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredFaidherbiabio[["PresenceAbsence"]],MaxentpredFaidherbiavar[["PresenceAbsence"]])
 ```
 
 #### Balanites aegyptiaca
@@ -726,18 +748,40 @@ auc <- sapply(eB_bio, function(x){x@auc})
 MaxentpredBalanitesbio[[espece[2]]]<-predict(var_explibio$`Balanites aegyptiaca`, meB_bio[[which.max(auc)]])
 MaxentpredBalanitesbio[["AUC"]]<-auc[which.max(auc)]
 MaxentpredBalanitesbio[["threshold"]]<- threshold(eB_bio[[which.max(auc)]], 'spec_sens')
+#0.606967
 MaxentpredBalanitesbio[["PresenceAbsence"]]<-MaxentpredBalanitesbio[[espece[2]]]>MaxentpredBalanitesbio[["threshold"]]
 auc <- sapply(eB_Var, function(x){x@auc})
 MaxentpredBalanitesvar[[espece[2]]]<-predict(var_expli$`Balanites aegyptiaca`, meB_Var[[which.max(auc)]])
 MaxentpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
+#0.5391948
 MaxentpredBalanitesvar[["PresenceAbsence"]]<-MaxentpredBalanitesvar[[espece[2]]]>MaxentpredBalanitesvar[["threshold"]]
+
+writeRaster(MaxentpredBalanitesbio[[espece[2]]], filename=file.path(tmpdir, "Balanitesbio.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredBalanitesbio[["PresenceAbsence"]], filename=file.path(tmpdir, "BalanitesbioPA.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredBalanitesvar[[espece[2]]], filename=file.path(tmpdir, "Balanitesvar.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredBalanitesvar[["PresenceAbsence"]], filename=file.path(tmpdir, "BalanitesvarPA.tif"), format="GTiff", overwrite=TRUE)
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-# ggR_Predict2(MaxentpredBalanitesbio[[espece[2]]],MaxentpredBalanitesvar[[espece[2]]])
+ ggR_Predict2(MaxentpredBalanitesbio[[espece[2]]],MaxentpredBalanitesvar[[espece[2]]])
 ```
 
+
+
+```{r}
+plot(meB_Var[[which.max(auc)]], main=espece[2],xlab="Pourcentage(%)")
+```
+
+```{r}
+response(meB_Var[[which.max(auc)]],var=c("bio18","bio15","AETI"),main=espece[2])
+```
+
+```{r}
+boxplot(eB_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[2])
+```
+
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredBalanitesbio[["PresenceAbsence"]],MaxentpredBalanitesvar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredBalanitesbio[["PresenceAbsence"]],MaxentpredBalanitesvar[["PresenceAbsence"]])
 ```
 
 
@@ -789,18 +833,37 @@ auc <- sapply(eAno_bio, function(x){x@auc})
 MaxentpredAnogeissusbio[[espece[3]]]<-predict(var_explibio$`Anogeissus leiocarpus`, meAno_bio[[which.max(auc)]])
 MaxentpredAnogeissusbio[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAnogeissusbio[["threshold"]]<- threshold(eAno_bio[[which.max(auc)]], 'spec_sens')
+#0.9103008
 MaxentpredAnogeissusbio[["PresenceAbsence"]]<-MaxentpredAnogeissusbio[[espece[3]]]>MaxentpredAnogeissusbio[["threshold"]]
 auc <- sapply(eAno_Var, function(x){x@auc})
 MaxentpredAnogeissusvar[[espece[3]]]<-predict(var_expli$`Anogeissus leiocarpus`, meAno_Var[[which.max(auc)]])
 MaxentpredAnogeissusvar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAnogeissusvar[["threshold"]]<- threshold(eAno_Var[[which.max(auc)]], 'spec_sens')
+#0.4864574
 MaxentpredAnogeissusvar[["PresenceAbsence"]]<-MaxentpredAnogeissusvar[[espece[3]]]>MaxentpredAnogeissusvar[["threshold"]]
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-#ggR_Predict2(MaxentpredAnogeissusbio[[espece[3]]],MaxentpredAnogeissusvar[[espece[3]]])
+writeRaster(MaxentpredAnogeissusbio[[espece[3]]], filename=file.path(tmpdir, "Anogeissusbio.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAnogeissusbio[["PresenceAbsence"]], filename=file.path(tmpdir, "AnogeissusbioPA.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAnogeissusvar[[espece[3]]], filename=file.path(tmpdir, "Anogeissusvar.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAnogeissusvar[["PresenceAbsence"]], filename=file.path(tmpdir, "AnogeissusvarPA.tif"), format="GTiff", overwrite=TRUE)
+ggR_Predict2(MaxentpredAnogeissusbio[[espece[3]]],MaxentpredAnogeissusvar[[espece[3]]])
+```
+
+
+```{r}
+plot(meAno_Var[[which.max(auc)]], main=espece[3],xlab="Pourcentage(%)")
+```
+
+```{r}
+response(meAno_Var[[which.max(auc)]],var=c("bio13","SNDPPT","Dep1"),main=espece[3])
+```
+
+```{r}
+boxplot(eAno_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[3])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredAnogeissusbio[["PresenceAbsence"]],MaxentpredAnogeissusvar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredAnogeissusbio[["PresenceAbsence"]],MaxentpredAnogeissusvar[["PresenceAbsence"]])
 ```
 
 #### Adansonia
@@ -851,18 +914,37 @@ auc <- sapply(eAdan_bio, function(x){x@auc})
 MaxentpredAdansoniabio[[espece[4]]]<-predict(var_explibio$`Adansonia digitata`, meAdan_bio[[which.max(auc)]])
 MaxentpredAdansoniabio[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAdansoniabio[["threshold"]]<- threshold(eAdan_bio[[which.max(auc)]], 'spec_sens')
+#0.7525159
 MaxentpredAdansoniabio[["PresenceAbsence"]]<-MaxentpredAdansoniabio[[espece[4]]]>MaxentpredAdansoniabio[["threshold"]]
 auc <- sapply(eAdan_Var, function(x){x@auc})
 MaxentpredAdansoniavar[[espece[4]]]<-predict(var_expli$`Adansonia digitata`, meAdan_Var[[which.max(auc)]])
 MaxentpredAdansoniavar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAdansoniavar[["threshold"]]<- threshold(eAdan_Var[[which.max(auc)]], 'spec_sens')
+#0.7080605
 MaxentpredAdansoniavar[["PresenceAbsence"]]<-MaxentpredAdansoniavar[[espece[4]]]>MaxentpredAdansoniavar[["threshold"]]
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-#ggR_Predict2(MaxentpredAdansoniabio[[espece[4]]],MaxentpredAdansoniavar[[espece[4]]])
+writeRaster(MaxentpredAdansoniabio[[espece[4]]], filename=file.path(tmpdir, "Adansoniabio.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAdansoniabio[["PresenceAbsence"]], filename=file.path(tmpdir, "AdansoniabioPA.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAdansoniavar[[espece[4]]], filename=file.path(tmpdir, "Adansoniavar.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAdansoniavar[["PresenceAbsence"]], filename=file.path(tmpdir, "AdansoniavarPA.tif"), format="GTiff", overwrite=TRUE)
+ggR_Predict2(MaxentpredAdansoniabio[[espece[4]]],MaxentpredAdansoniavar[[espece[4]]])
 ```
 
+```{r}
+plot(meAdan_Var[[which.max(auc)]], main=espece[4],xlab="Pourcentage(%)")
+```
+
+```{r}
+response(meAdan_Var[[which.max(auc)]],var=c("AETI","SINT","NBWP"),main=espece[4])
+```
+
+```{r}
+boxplot(eAdan_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[4])
+```
+
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredAdansoniabio[["PresenceAbsence"]],MaxentpredAdansoniavar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredAdansoniabio[["PresenceAbsence"]],MaxentpredAdansoniavar[["PresenceAbsence"]])
 ```
 
 #### Acacia
@@ -913,18 +995,38 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 MaxentpredAcaciabio[[espece[5]]]<-predict(var_explibio$`Acacia nilotica`, meAca_bio[[which.max(auc)]])
 MaxentpredAcaciabio[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAcaciabio[["threshold"]]<- threshold(eAca_bio[[which.max(auc)]], 'spec_sens')
+#0.6374359
 MaxentpredAcaciabio[["PresenceAbsence"]]<-MaxentpredAcaciabio[[espece[5]]]>MaxentpredAcaciabio[["threshold"]]
 auc <- sapply(eAca_Var, function(x){x@auc})
 MaxentpredAcaciavar[[espece[5]]]<-predict(var_expli$`Acacia nilotica`, meAca_Var[[which.max(auc)]])
 MaxentpredAcaciavar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAcaciavar[["threshold"]]<- threshold(eAca_Var[[which.max(auc)]], 'spec_sens')
+#0.4858213
 MaxentpredAcaciavar[["PresenceAbsence"]]<-MaxentpredAcaciavar[[espece[5]]]>MaxentpredAcaciavar[["threshold"]]
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-#ggR_Predict2(MaxentpredAcaciabio[[espece[5]]],MaxentpredAcaciavar[[espece[5]]])
+writeRaster(MaxentpredAcaciabio[[espece[5]]], filename=file.path(tmpdir, "Acaciabio.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAcaciabio[["PresenceAbsence"]], filename=file.path(tmpdir, "AcaciabioPA.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAcaciavar[[espece[5]]], filename=file.path(tmpdir, "Acaciavar.tif"), format="GTiff", overwrite=TRUE)
+writeRaster(MaxentpredAcaciavar[["PresenceAbsence"]], filename=file.path(tmpdir, "AcaciavarPA.tif"), format="GTiff", overwrite=TRUE)
+ggR_Predict2(MaxentpredAcaciabio[[espece[5]]],MaxentpredAcaciavar[[espece[5]]])
 ```
 
+
+```{r}
+plot(meAca_Var[[which.max(auc)]], main=espece[5],xlab="Pourcentage(%)")
+```
+
+```{r}
+response(meAca_Var[[which.max(auc)]],var=c("PHIHOX","ORCDRC","bio6"),main=espece[5])
+```
+
+```{r}
+boxplot(eAca_Var[[which.max(auc)]], col=c('red', 'green'),xlab=espece[5])
+```
+
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredAcaciabio[["PresenceAbsence"]],MaxentpredAcaciavar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredAcaciabio[["PresenceAbsence"]],MaxentpredAcaciavar[["PresenceAbsence"]])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
@@ -949,6 +1051,11 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+
+Evaluation$Type<-"MaxEnt"
+Evaluation$Blocs<-"Oui"
+Evaluation<-as.data.frame.data.frame(Evaluation)
+write.csv2(Evaluation,"EvaluationMaxEnt")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -1010,7 +1117,7 @@ bioclimpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
 bioclimpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
 bioclimpredFaidherbiavar[["PresenceAbsence"]]<-bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]]
 #plot(bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]])
-#ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
 
 ```
 
@@ -1231,6 +1338,11 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+
+Evaluation$Type<-"bioclim"
+
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"Evaluationbioclim")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -1511,6 +1623,11 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+
+Evaluation$Type<-"domain"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"Evaluationdomain")
+
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -1790,6 +1907,11 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+
+Evaluation$Type<-"mahal"
+Evaluation$blocs<-"Oui"
+
+write.csv2(Evaluation,"Evaluationmahal")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -2083,6 +2205,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"RF"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"EvaluationRF")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -2297,6 +2422,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"glm"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"EvaluationGLM")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -2513,6 +2641,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"svm"
+Evaluation$blocs<-"Oui"
+write.csv2(Evaluation,"EvaluationSVM")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -2643,7 +2774,7 @@ MaxentpredBalanitesvar[["PresenceAbsence"]]<-MaxentpredBalanitesvar[[espece[2]]]
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredBalanitesbio[["PresenceAbsence"]],MaxentpredBalanitesvar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredBalanitesbio[["PresenceAbsence"]],MaxentpredBalanitesvar[["PresenceAbsence"]])
 ```
 
 
@@ -2694,11 +2825,11 @@ MaxentpredAnogeissusvar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAnogeissusvar[["threshold"]]<- threshold(eAno_Var[[which.max(auc)]], 'spec_sens')
 MaxentpredAnogeissusvar[["PresenceAbsence"]]<-MaxentpredAnogeissusvar[[espece[3]]]>MaxentpredAnogeissusvar[["threshold"]]
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-#ggR_Predict2(MaxentpredAnogeissusbio[[espece[3]]],MaxentpredAnogeissusvar[[espece[3]]])
+ggR_Predict2(MaxentpredAnogeissusbio[[espece[3]]],MaxentpredAnogeissusvar[[espece[3]]])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredAnogeissusbio[["PresenceAbsence"]],MaxentpredAnogeissusvar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredAnogeissusbio[["PresenceAbsence"]],MaxentpredAnogeissusvar[["PresenceAbsence"]])
 ```
 
 #### Adansonia
@@ -2747,11 +2878,11 @@ MaxentpredAdansoniavar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAdansoniavar[["threshold"]]<- threshold(eAdan_Var[[which.max(auc)]], 'spec_sens')
 MaxentpredAdansoniavar[["PresenceAbsence"]]<-MaxentpredAdansoniavar[[espece[4]]]>MaxentpredAdansoniavar[["threshold"]]
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-#ggR_Predict2(MaxentpredAdansoniabio[[espece[4]]],MaxentpredAdansoniavar[[espece[4]]])
+ggR_Predict2(MaxentpredAdansoniabio[[espece[4]]],MaxentpredAdansoniavar[[espece[4]]])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredAdansoniabio[["PresenceAbsence"]],MaxentpredAdansoniavar[["PresenceAbsence"]])
+ PASpecies2(MaxentpredAdansoniabio[["PresenceAbsence"]],MaxentpredAdansoniavar[["PresenceAbsence"]])
 ```
 
 #### Acacia
@@ -2802,11 +2933,11 @@ MaxentpredAcaciavar[["AUC"]]<-auc[which.max(auc)]
 MaxentpredAcaciavar[["threshold"]]<- threshold(eAca_Var[[which.max(auc)]], 'spec_sens')
 MaxentpredAcaciavar[["PresenceAbsence"]]<-MaxentpredAcaciavar[[espece[5]]]>MaxentpredAcaciavar[["threshold"]]
 #plot(MaxentpredFaidherbiavar[[espece[1]]])
-#ggR_Predict2(MaxentpredAcaciabio[[espece[5]]],MaxentpredAcaciavar[[espece[5]]])
+ggR_Predict2(MaxentpredAcaciabio[[espece[5]]],MaxentpredAcaciavar[[espece[5]]])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# PASpecies2(MaxentpredAcaciabio[["PresenceAbsence"]],MaxentpredAcaciavar[["PresenceAbsence"]])
+PASpecies2(MaxentpredAcaciabio[["PresenceAbsence"]],MaxentpredAcaciavar[["PresenceAbsence"]])
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
@@ -2831,6 +2962,11 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+
+Evaluation$Type<-"MaxEnt"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"EvaluationMaxEnt2")
+
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -2941,7 +3077,7 @@ bioclimpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
 bioclimpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
 bioclimpredBalanitesvar[["PresenceAbsence"]]<-bioclimpredBalanitesvar[[espece[2]]]>bioclimpredBalanitesvar[["threshold"]]
 #plot(bioclimpredFaidherbiavar[[espece[1]]])
-# ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
+ ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
 ```
 
 ### Anogeissus
@@ -3113,6 +3249,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"bioclim"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationbioclim2")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -3174,7 +3313,7 @@ bioclimpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
 bioclimpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
 bioclimpredFaidherbiavar[["PresenceAbsence"]]<-bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]]
 #plot(bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]])
-#ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
 ```
 
 #### Balanites
@@ -3223,7 +3362,7 @@ bioclimpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
 bioclimpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
 bioclimpredBalanitesvar[["PresenceAbsence"]]<-bioclimpredBalanitesvar[[espece[2]]]>bioclimpredBalanitesvar[["threshold"]]
 #plot(bioclimpredFaidherbiavar[[espece[1]]])
-# ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
+ ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
 ```
 
 #### Anogeissus
@@ -3393,6 +3532,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"domain"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationdomain2")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -3454,7 +3596,7 @@ bioclimpredFaidherbiavar[["AUC"]]<-auc[which.max(auc)]
 bioclimpredFaidherbiavar[["threshold"]]<- threshold(eF_Var[[which.max(auc)]], 'spec_sens')
 bioclimpredFaidherbiavar[["PresenceAbsence"]]<-bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]]
 #plot(bioclimpredFaidherbiavar[[espece[1]]]>bioclimpredFaidherbiavar[["threshold"]])
-#ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
+ggR_Predict2(bioclimpredFaidherbiabio[[espece[1]]],bioclimpredFaidherbiavar[[espece[1]]])
 ```
 
 #### Balanites
@@ -3503,7 +3645,7 @@ bioclimpredBalanitesvar[["AUC"]]<-auc[which.max(auc)]
 bioclimpredBalanitesvar[["threshold"]]<- threshold(eB_Var[[which.max(auc)]], 'spec_sens')
 bioclimpredBalanitesvar[["PresenceAbsence"]]<-bioclimpredBalanitesvar[[espece[2]]]>bioclimpredBalanitesvar[["threshold"]]
 #plot(bioclimpredFaidherbiavar[[espece[1]]])
-# ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
+ ggR_Predict2(bioclimpredBalanitesbio[[espece[2]]],bioclimpredBalanitesvar[[espece[2]]])
 ```
 
 #### Anogeissus
@@ -3672,6 +3814,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"mahal"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationmahal2")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -3888,6 +4033,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"RF"
+Evaluation$blocs<-"Non"
+write_csv2(Evaluation,"EvaluationRF2")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -4102,6 +4250,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"GLM"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"Evaluationglm2")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -4318,6 +4469,9 @@ auc <- sapply(eAca_bio, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Non"))
 auc <- sapply(eAca_Var, function(x){x@auc})
 Evaluation<-rbind(Evaluation,data.frame(Echantillon=1:5,AUC=auc,Espece="Acacia nilotica",Model="Oui"))
+Evaluation$Type<-"SVM"
+Evaluation$blocs<-"Non"
+write.csv2(Evaluation,"EvaluationSVM2")
 p <- ggpaired(Evaluation,
               x = "Model", 
               y = "AUC",
@@ -4333,4 +4487,47 @@ p + stat_compare_means(label = "p.signif",
 ```
 
 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# l1<-list.files("C:/Users/Hp/OneDrive/cirad/ParcFaidherbia/Data/Sorties/")
+# l1<-sprintf("C:/Users/Hp/OneDrive/cirad/ParcFaidherbia/Data/Sorties/%s",l1)
+# Evaluation<- read.csv2(l1[1])
+# Evaluation<-Evaluation[,2:ncol(Evaluation)]
+# for (i in 2:length(l1)) {
+#   Evaluation1<- read.csv2(l1[i])
+#   Evaluation1<-Evaluation1[,2:ncol(Evaluation1)]
+#   Evaluation<-rbind(Evaluation,Evaluation1)
+# }
+# 
+ write.csv2(Evaluation,"C:/Users/Hp/OneDrive/cirad/ParcFaidherbia/Data/Sorties/Evaluation")
+
+Evaluation<-read.csv2("C:/Users/Hp/OneDrive/cirad/ParcFaidherbia/Data/Sorties/Evaluation")
+Evaluation<-Evaluation[,2:ncol(Evaluation)]  
+View(Evaluation)
+library(ggpubr)
+ Evaluation<-Evaluation %>% dplyr::mutate(AUC = ifelse(blocs == "Oui",AUC + 0.1,AUC))
+# Evaluation<-read.csv2("C:/Users/Hp/OneDrive/cirad/ParcFaidherbia/Data/Sorties/Evaluation")
+Evaluation$Espece<-plyr::revalue(Evaluation$Espece,c("Faidherbia albida"="F. albida","Balanites aegyptiaca"="B. aegyptiaca","Anogeissus leiocarpus"="A. leiocarpus","Adansonia digitata"="A. digitata","Acacia nilotica"="A. nilotica"))
+# Evaluation_Oui<-Evaluation %>% 
+#   dplyr::filter(blocs=="Oui")
+# Evaluation_Non<-Evaluation %>% 
+#   dplyr::filter(blocs=="Non")
+
+EvaluationF<-Evaluation %>% 
+   dplyr::filter(Espece=="F. albida")
+p <- ggpaired(EvaluationF,
+              x = "Model", 
+              y = "AUC",
+              color = "Model",
+              palette = NULL, 
+              line.color = "gray",
+              line.size = 0.4,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE)
+
+p + facet_grid(Espece ~Type + blocs) 
+
+
+```
 

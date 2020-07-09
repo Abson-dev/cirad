@@ -29,6 +29,27 @@ graphics.off() #Effacement de tous les graphiques en mémoire
 l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
 l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 worldclim<-stack(l1)
+bio1 <- raster(worldclim, layer=1)
+plot(bio1)
+
+##########
+ggR_P<-function(rasterLayer){
+samp <- raster::sampleRegular(rasterLayer, 5e+05, asRaster = TRUE)
+map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                na.rm = TRUE)
+colnames(map_df) <- c("Easting", "Northing", "MAP")
+basePlot1 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                      ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+basePlot1<-basePlot1 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") +
+  ggtitle(label = names(rasterLayer)) + 
+  theme(plot.title = element_text(hjust = 0.5, size = 10)) + 
+  ggplot2::scale_fill_gradientn(name = "Probabilité", colours = rev(terrain.colors(10)))
+return(basePlot1)
+}
+ggR_P(bio1)
+ggR_P(PHIHOX)
+ggarrange(ggR_P(AETI),ggR_P(NBWP))
+ggarrange(ggR_P(SINT),ggR_P(SOS))
 # import presence-absence species data
 filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
@@ -103,7 +124,7 @@ bio1_6<-ggarrange(b1,b2,b3,b4,b5,b6)
 ggexport(bio1_6,filename ="bio1_6.png",width = 948, height = 480)
 bio7_12<-ggarrange(b7,b8,b9,b10,b11,b12)
 ggexport(bio7_12,filename ="bio7_12.png",width = 948, height = 480)
-bio13_19<-ggarrange(b13,b14,b15,b16,b17,b18,b19)
+bio13_18<-ggarrange(b13,b14,b15,b16,b17,b18)
 ggexport(bio13_19,filename ="bio13_19.png",width = 948, height = 480)
 ########################## Variables sur le Sol
 rm(list = ls()) #Effacement de toutes les données en mémoire
@@ -117,7 +138,7 @@ class(lsoil)
 #######
 ggR_Soil<-function(RasterLayer){
   ggR(RasterLayer,geom_raster = TRUE,ggLayer = F) +
-    scale_fill_gradientn(name = "", colours = terrain.colors(100))  +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(100)))  +
     theme_bw() + xlab("Longitude") + ylab("Latitude") +
     ggtitle(label = names(RasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
   
@@ -228,3 +249,160 @@ names(NBWP.crop)<-"NBWP"
 NB<-ggR_Soil(NBWP.crop)
 wapor<-ggarrange(NB,AETI)
 ggexport(wapor,filename ="wapor.png",width = 948, height = 480)
+
+
+##########
+names(SoilGrid.crop)
+bio19<-ggR_Soil(bio19)
+AETI<-ggR_Soil(AETI)
+SINT<-ggR_Soil(SINT)
+SOS<-ggR_Soil(SOS)
+NBWP<-ggR_Soil(NBWP)
+CLYPPT<-ggR_Soil(CLYPPT)
+ggarrange(bio19,AETI,SINT,SOS,NBWP,CLYPPT)
+ORCDRC<-ggR_Soil(ORCDRC)
+PHIHOX<-ggR_Soil(PHIHOX)
+NTO<-ggR_Soil(NTO)
+SNDPPT<-ggR_Soil(SNDPPT)
+P<-ggR_Soil(P)
+Slo1<-ggR_Soil(Slo1)
+ggarrange(ORCDRC,PHIHOX,NTO,SNDPPT,P,Slo1)
+Len1<-ggR_Soil(Len1)
+Sll<-ggR_Soil(Sll)
+Csl<-ggR_Soil(Csl)
+Wid1<-ggR_Soil(Wid1)
+Dep1<-ggR_Soil(Dep1)
+Elev<-ggR_Soil(Elev)
+ggarrange(Len1,Sll,Csl,Wid1,Dep1,Elev)
+
+#################################
+reshapePA<-function(Rasterstack,espece){
+  Pred<-list()
+  data<-as.data.frame(Rasterstack)
+  PA<-reshape(data, direction = "long", varying=1:ncol(data),v.names = c("Pred"),times =1:ncol(data) )
+  PA$Species<-rep(espece,each=nrow(data))
+  PA<-PA[,c("Pred","Species")]
+  BaseStat<-as.data.frame(cprop(table(PA)))
+  BaseStat<-BaseStat %>%
+    filter(Pred!="Total") %>%
+    filter(Species!="Ensemble")
+  
+  BaseStat$Freq<-round(BaseStat$Freq,2) 
+  Pred[["Predict table"]]<-BaseStat
+  plot<-ggbarplot(BaseStat,
+                  x = "Species", y = "Freq",
+                  fill = "Pred",
+                  color = "Pred",
+                  legend="top",label=TRUE,lab.pos = "in",ggtheme = theme_bw()) 
+  
+  Pred[["Plot"]]<-plot
+  return(Pred)
+}
+
+#### presence absence function
+PASpecies<-function(rasterLayer){
+  samp <- raster::sampleRegular(rasterLayer, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                       ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  # ptr <- basePlot + ggplot2::geom_sf(data = speciesData, 
+  #                                    alpha = 0.7, color = "blue", size = 1) +
+  #   ggplot2::theme_bw() + ggplot2::labs(x = "", y = "") 
+  # # +
+  #   ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))
+  # plot(cowplot::plot_grid(ptr))
+  basePlot<-basePlot + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = names(rasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("red","green"),name="Espèce",labels=c("Absence","Présence"))
+  return(basePlot)
+  
+}
+PASpecies2<-function( rasterLayer1,rasterLayer2){
+  #speciesData <- sf::st_as_sf(speciesData)
+  samp <- raster::sampleRegular(rasterLayer1, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot1 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                        ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  basePlot1<-basePlot1 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = "(a)") + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="EspÃ¨ce",labels=c("Absence","PrÃ©sence"))
+  samp <- raster::sampleRegular(rasterLayer2, 5e+05, asRaster = TRUE)
+  map_df <- raster::as.data.frame(samp, xy = TRUE, centroids = TRUE, 
+                                  na.rm = TRUE)
+  colnames(map_df) <- c("Easting", "Northing", "MAP")
+  basePlot2 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df, 
+                                                        ggplot2::aes_string(y = "Northing", x = "Easting", fill = "MAP"))
+  basePlot2<-basePlot2 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") + ggtitle(label = "(b)") + theme(plot.title = element_text(hjust = 0.5, size = 10))+scale_fill_manual(values=c("white","green"),name="EspÃ¨ce",labels=c("Absence","PrÃ©sence"))
+  ggpubr::ggarrange(basePlot1,basePlot2,common.legend = TRUE)
+  
+  
+}
+
+
+lsoil<-list.files("C:\\Users\\Hp\\OneDrive\\cirad\\Sorties\\",patt="\\.tif")
+lsoil<-sprintf("C:\\Users\\Hp\\OneDrive\\cirad\\Sorties\\%s",lsoil)
+# espece=c("Cordyla pinnata","Azadirachta indica")
+# c("Faidherbia albida"="F. albida","Balanites aegyptiaca"="B. aegyptiaca",
+#   "Anogeissus leiocarpus"="A. leiocarpus","Adansonia digitata"="A. digitata","Acacia nilotica"="A. nilotica"))
+
+
+Acaciavar<-raster(lsoil[3])
+names(Acaciavar)<-"Acacia nilotica"
+Adansoniavar<-raster(lsoil[7])
+names(Adansoniavar)<-"Adansonia digitata"
+Anogeissusvar<-raster(lsoil[11])
+names(Anogeissusvar)<-"Anogeissus leiocarpus"
+Azadirachtavar<-raster(lsoil[15])
+names(Azadirachtavar)<-"Azadirachta indica"
+Balanitesvar<-raster(lsoil[19])
+names(Balanitesvar)<-"Balanites aegyptiaca"
+Cordylavar<-raster(lsoil[23])
+names(Cordylavar)<-"Cordyla pinnata"
+Faidherbiavar<-raster(lsoil[27])
+names(Faidherbiavar)<-"Faidherbia albida"
+Ficusvar<-raster(lsoil[32])
+names(Ficusvar)<-"Ficus capensis"
+Prosopisvar<-raster(lsoil[36])
+names(Prosopisvar)<-"Prosopis africana"
+ggarrange(ggR_P(Faidherbiavar),ggR_P(Acaciavar),
+          ggR_P(Balanitesvar),ggR_P(Anogeissusvar),ggR_P(Adansoniavar),
+          common.legend = TRUE)
+
+ggarrange(ggR_P(Cordylavar),ggR_P(Azadirachtavar),ggR_P(Ficusvar),
+          ggR_P(Prosopisvar),
+          common.legend = TRUE)
+
+Acaciavar<-raster(lsoil[4])
+names(Acaciavar)<-"Acacia nilotica"
+Adansoniavar<-raster(lsoil[8])
+names(Adansoniavar)<-"Adansonia digitata"
+Anogeissusvar<-raster(lsoil[12])
+names(Anogeissusvar)<-"Anogeissus leiocarpus"
+Azadirachtavar<-raster(lsoil[16])
+names(Azadirachtavar)<-"Azadirachta indica"
+Balanitesvar<-raster(lsoil[20])
+names(Balanitesvar)<-"Balanites aegyptiaca"
+Cordylavar<-raster(lsoil[24])
+names(Cordylavar)<-"Cordyla pinnata"
+Faidherbiavar<-raster(lsoil[29])
+names(Faidherbiavar)<-"Faidherbia albida"
+Ficusvar<-raster(lsoil[33])
+names(Ficusvar)<-"Ficus capensis"
+Prosopisvar<-raster(lsoil[37])
+names(Prosopisvar)<-"Prosopis africana"
+
+ggR_Soil<-function(RasterLayer){
+  p<-ggR(RasterLayer,geom_raster = TRUE,ggLayer = F) +
+    scale_fill_gradientn(name = "", colours = rev(terrain.colors(100)))  +
+    theme_bw() + xlab("Longitude") + ylab("Latitude") +
+    ggtitle(label = names(RasterLayer)) + theme(plot.title = element_text(hjust = 0.5, size = 10),legend.position = "none")
+  
+  return(p)
+}
+ggR_Soil(Faidherbiavar)
+plot(Faidherbiavar)
+ggarrange(ggR_Soil(Faidherbiavar),ggR_Soil(Acaciavar),
+          ggR_Soil(Balanitesvar),ggR_Soil(Anogeissusvar),ggR_Soil(Adansoniavar)
+          )
+ggarrange(ggR_Soil(Cordylavar),ggR_Soil(Azadirachtavar),ggR_Soil(Ficusvar),
+          ggR_Soil(Prosopisvar))

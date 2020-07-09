@@ -295,6 +295,110 @@ library(xtable)
 xtable(joincount.multi(Faidherbia,listw2U(nb2listw(voisins4))))
 
 
+
+
+Recodificateur <- function(data,espece,varying){
+  for (lag_size in espece) {
+    data <- data %>% 
+      dplyr::mutate(!!sym(lag_size) := as.factor(ifelse(varying == lag_size,1,0)))
+  }
+  return(data)
+}
+######construire des bases des esp√®ces choisies
+Base<-function(Species,coord,espece){
+  Species<-st_drop_geometry(Species)
+  data<-list()
+  for (i in 1:length(espece)) {
+    data[[espece[i]]]<-Species[,c(coord[1],coord[2],espece[i])] 
+    # %>% 
+    #   dplyr::select(coord[1],coord[2],espece[i])
+    
+  }
+  return(data)
+}
+
+chemin<-"C:\\Users\\Hp\\OneDrive\\cirad\\ParcFaidherbia\\Data\\BD_Arbres"
+#data<-"arbres_diohine_mai2018_par_Zone_OK_BON.shp" # base des arbres du parc ‡ Cordyla pinnata
+data<-"bd_arbres_nioro.shp"
+data<-paste0("\\",data)
+filename<-paste0(chemin,data)
+#########Importation de la base arbre
+Species<-st_read(filename,quiet = T)
+#Precisez les especes a modeliser
+
+
+
+
+
+espece=c("Cordyla pinnata","Azadirachta indica","Prosopis africana","Ficus capensis")
+# espece = c("Cordyla pinnata","Azadirachta indica","Anogeissus leiocarpus",
+#            "Adansonia digitata","Acacia nilotica")
+coord<-c("xcoord","ycoord") #les variables sur la longitude=xcoord et la latitude=ycoord
+#coord<-c("Long","Lat")
+# Species <- Recodificateur(data = Species,espece = espece,varying = Species$Species)
+# Base<-Base(Species,coord,espece)
+Species <- Recodificateur(data = Species,espece = espece,varying = Species$Espece)
+Base<-Base(Species,coord,espece)
+BaseCord<-Base$`Cordyla pinnata`
+BaseAz<-Base$`Azadirachta indica`
+BasePr<-Base$`Prosopis africana`
+BaseFicus<-Base$`Ficus capensis`
+names(BaseCord)<-c("lon","lat","Cordyla")
+names(BaseAz)<-c("lon","lat","Azadirachta")
+names(BasePr)<-c("lon","lat","Prosopis")
+names(BaseFicus)<-c("lon","lat","Ficus")
+
+Base_FZ4<-BaseFicus
+
+Base_FZ4$Ficus<-as.factor(Base_FZ4$Ficus)
+Ficus<-Base_FZ4$Ficus
+#CrÈation des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ4) <-~lon+lat
+sp::proj4string(Base_FZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_FZ4,k=5))
+#Mise en oeuvre du test
+joincount.multi(Ficus,listw2U(nb2listw(voisins4)))
+
+##########V
+Base_FZ4<-BasePr
+
+Base_FZ4$Prosopis<-as.factor(Base_FZ4$Prosopis)
+Prosopis<-Base_FZ4$Prosopis
+#CrÈation des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ4) <-~lon+lat
+sp::proj4string(Base_FZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_FZ4,k=5))
+#Mise en oeuvre du test
+joincount.multi(Prosopis,listw2U(nb2listw(voisins4)))
+
+
+Base_FZ4<-BaseCord
+Base_FZ4$Cordyla<-as.factor(Base_FZ4$Cordyla)
+###conversion en facteur
+Cordyla <- Base_FZ4$Cordyla
+#CrÈation des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ4) <-~lon+lat
+sp::proj4string(Base_FZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_FZ4,k=5))
+#Mise en oeuvre du test
+joincount.multi(Cordyla,listw2U(nb2listw(voisins4)))
+Base_FZ4<-BaseAz
+Base_FZ4$Azadirachta<-as.factor(Base_FZ4$Azadirachta)
+###conversion en facteur
+Azadirachta <- Base_FZ4$Azadirachta
+#CrÈation des listes de voisins et matrices de poids
+sp::coordinates(Base_FZ4) <-~lon+lat
+sp::proj4string(Base_FZ4) <-"+proj=longlat +datum=WGS84"
+voisins4<- knn2nb(knearneigh(Base_FZ4,k=5))
+#Mise en oeuvre du test
+joincount.multi(Azadirachta,listw2U(nb2listw(voisins4)))
+
+##########"
+
+
+
+
+
 #############1 avec le corrÈlogramme de SDMSelect
 ######zone 1
 data.prepared1<-Prepare_dataset(x=dataFZ1,var=1,cov = 2:ncol(dataFZ1),datatype = "PA",na.rm = TRUE)
@@ -302,6 +406,7 @@ data.prepared1<-Prepare_dataset(x=dataFZ1,var=1,cov = 2:ncol(dataFZ1),datatype =
 data.prepared2<-Prepare_dataset(x=dataFZ2,var=1,cov = 2:ncol(dataFZ2),datatype = "PA",na.rm = TRUE)
 library(gstat)
 
+##############
 
 
 

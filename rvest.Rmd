@@ -1,0 +1,151 @@
+---
+title: "HTML (Web Scraping)"
+author: "Aboubacar HEMA,ITS4"
+date: "4 juillet 2020"
+output:
+  word_document:
+    reference_docx: Reference.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# rvest, pour quoi faire ?
+
+**rvest** est un package qui vous permet de parser (autrement dit de parcourir et d'aller chercher) le contenu d'une page web, pour le rendre exploitable par R. Un exemple ? Créer une liste depuis une page Wikipédia, récupérer un texte sur une page, transformer un tableau html en data.frame. bref, les possibilités sont nombreuses.
+
+```{r}
+library(rvest)
+library(tidyverse)
+text_rvest <- read_html("http://www.gutenberg.org/cache/epub/132/pg132.html") %>%
+html_text()
+#text_rvest
+```
+
+## rvest et le HTML/CSS
+
+```{r}
+dist_lev <- read_html("https://fr.wikipedia.org/wiki/Distance_de_Levenshtein")
+```
+
+POUR EXTRAIRE DU TEXTE
+
+```{r}
+dist_lev %>%
+  html_nodes("h2") %>%
+  html_text()
+```
+
+Voire, tout simplement, le texte du cinquième élément de la partie Notes et Références :
+
+```{r}
+dist_lev %>%
+  html_node("#cite_note-5 .reference-text") %>%
+  html_text()
+```
+
+```{r}
+dist_lev %>%
+  html_node('table') %>% 
+  html_table()
+```
+
+## INTERLUDE : TAGS ET ATTRIBUTS
+
+### SCRAPER LES TAGS ET LES ATTRIBUTS D'UN ÉLÉMENT DU DOM
+
+```{r}
+dist_lev %>%
+  html_node("h1") %>%
+  html_attrs()
+```
+
+```{r}
+# Anciennement connu comme html_tag()
+dist_lev %>%
+  html_node(xpath = '//*[@id="mw-content-text"]/div/h2[3]') %>%
+  html_name()
+```
+
+## Faire du webscraping avec **rvest**
+
+```{r}
+library(stringr)
+dataset_url <- "https://vincentarelbundock.github.io/Rdatasets/datasets.html"
+
+list_dataset <- read_html(dataset_url) %>%
+  html_nodes(".cellinside:nth-child(6) a") %>%
+  html_attr("href")
+
+purrr::map(.x = list_dataset, 
+           ~download.file(.x, 
+                          destfile = str_extract(.x, "[[:alnum:]]*.csv$"))
+)
+```
+
+## DE LA PAGE WEB AU DATA FRAME
+
+```{r}
+thinkr_url <- read_html("http://www.thinkr.fr/expert-logiciel-r/")
+
+# Les noms 
+thinkr_url %>%
+  html_nodes(".team-author-name") %>%
+  html_text()
+      
+
+# Les mails 
+thinkr_url %>%
+  html_nodes("a.mail") %>%
+  html_attr("href") %>%
+  stringr::str_replace_all("mailto:", "")
+
+# Les comptes twitter 
+thinkr_url %>%
+  html_nodes("a.twitter") %>%
+  html_attr("href")
+
+# Les comptes Github 
+thinkr_url %>%
+  html_nodes("a.github") %>%
+  html_attr("href")
+
+# Et pour tout avoir dans un joli tableau :
+
+thinkr <- data_frame(
+  name = thinkr_url %>%
+    html_nodes(".team-author-name") %>%
+    html_text(),
+  mail = thinkr_url %>%
+    html_nodes("a.mail") %>%
+    html_attr("href") %>%
+    stringr::str_replace_all("mailto:", ""), 
+  twitter = thinkr_url %>%
+    html_nodes("a.twitter") %>%
+    html_attr("href"),
+  github = thinkr_url %>%
+    html_nodes("a.github") %>%
+    html_attr("href")
+)
+```
+
+## NAVIGUER SUR UNE PAGE AVEC RVEST
+
+```{r}
+library(httr)
+thinkr_session <- html_session("http://www.thinkr.fr/")
+
+# Avec les urls
+thinkr_session %>% 
+  jump_to("formation-au-logiciel-r/") %>% 
+  jump_to("programmation-avancee-avec-r/") %>% 
+  session_history()
+
+# Avec du texte
+thinkr_session %>% 
+  follow_link("Développement en langage R") %>% 
+  follow_link("contactez-nous") %>% 
+  session_history()
+```
+

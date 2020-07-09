@@ -1,0 +1,302 @@
+---
+title: "Data Wrangling with dplyr and tidyr"
+author :
+- Aboubacar HEMA 
+
+date: "June 26, 2020"
+output:
+  word_document:
+    reference_docx: Reference.docx
+    
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Import with readr, tibble, and tidyr
+
+R's **tidyverse** is built around **tidy data** stored in
+**tibbles**, an enhanced version of a data frame.
+
+## Read functions 
+
+### Read tabular data to tibbles
+
+These functions share the common arguments:
+**read_**
+```{r message=FALSE, warning=FALSE}
+
+```
+
+#### read_csv()
+
+Reads comma delimited files. 
+
+
+# Tidy Data
+Tidy Data is  a foundation for wrangling in R. In a tidy data set, each variable is saved in its own column and each observation is saved in its own row.Tidy data complements R's vectorized
+operations. R will automatically preserve
+observations as you manipulate variables.
+No other format works as intuitively with R.
+
+## Syntax - Helpful conventions for wrangling
+### tbl_df()
+
+Converts data to tbl class. tbl's are easier to examine than
+data frames. R displays only the data that fits on screen.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+dplyr::tbl_df(iris)
+```
+
+### glimpse()
+
+Information dense summary of tbl data.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+dplyr::glimpse(iris)
+```
+
+### View()
+
+View data set in spreadsheet-like display (note capital V).
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#utils::View(iris)
+```
+
+### %>%
+
+Passes object on lef hand side as first argument (or .
+argument) of function on righthand side. 
+x %>% f(y) is the same as f(x, y) and y %>% f(x, ., z) is the same as f(x, y, z ).
+"Piping" with %>% makes code more readable, e.g:
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+iris %>%
+ group_by(Species) %>%
+ summarise(avg = mean(Sepal.Width)) %>%
+ arrange(avg)
+```
+
+## Reshaping Data - Change the layout of a data set
+
+### gather()
+
+Gather columns into rows.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(tidyr)
+mini_iris <-
+  iris %>%
+  group_by(Species) %>%
+  slice(1)
+mini_gather<-mini_iris %>% gather(key = "flower_att", value = "measurement", -Species)
+#utils::View(mini_iris)
+```
+
+### spread()
+
+Spread rows into columns
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+mini_gather %>% spread(flower_att,measurement)
+```
+
+### separate()
+
+Separate one column into several.
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+df <- data.frame(x = c(NA, "a.b", "a.d", "b.c"))
+df
+#utils::View(df)
+df %>% separate(x, c("A", "B"))
+```
+
+If you just want the second variable:
+```{r}
+df %>% separate(x, c(NA, "B"))
+```
+
+### unite()
+
+Unite several columns into one.
+```{r}
+df<-df %>% separate(x, c("A", "B"))
+df %>% unite("x", A:B, remove = FALSE)
+```
+
+To remove missing values:
+```{r}
+df %>% unite("x", A:B, na.rm = TRUE, remove = FALSE)
+
+```
+
+## Subset Observations (Rows)
+
+### filter()
+
+Extract rows that meet logical criteria.
+
+### distinct()
+Remove duplicate rows. 
+
+### sample_frac()
+
+Randomly select fraction of rows.
+
+### sample_n()
+
+Randomly select n rows. 
+
+### slice()
+
+Select rows by position. 
+
+### top_n()
+
+Select and order top n entries (by group if grouped data).
+
+
+
+## Subset Variables (Columns)
+
+### select()
+
+Select columns by name or helper function.Helper functions for select.
+
+#### select(iris,contains("."))
+
+Select columns whose name contains a character string. 
+
+#### select(iris, ends_with("Length"))
+
+Select columns whose name ends with a character string. 
+
+ 
+#### select(iris, everything())
+
+Select every column.
+
+#### select(iris, matches(".t."))
+
+Select columns whose name matches a regular expression.
+
+#### select(iris, num_range("x", 1:5))
+
+Select columns named x1, x2, x3, x4, x5.
+
+#### select(iris, one_of(c("Species", "Genus")))
+
+Select columns whose names are in a group of names.
+
+#### select(iris, starts_with("Sepal"))
+
+Select columns whose name starts with a character string.
+
+#### select(iris, Sepal.Length:Petal.Width)
+
+Select all columns between Sepal.Length and Petal.Width (inclusive).
+
+#### select(iris, -Species)
+
+Select all columns except Species. 
+
+## Summarise Data
+
+### summarise()
+
+Summarise data into single row of values. 
+
+### summarise_each(iris,funs(mean))
+
+Apply summary function to each column.
+
+### count()
+
+Count number of rows with each unique value of
+variable (with or without weights).
+
+## Make New Variables
+
+### mutate()
+
+Compute and append one or more new columns.
+
+### mutate_each(iris,funs(min_rank))
+
+Apply window function to each column. 
+
+### transmute()
+
+Compute one or more new columns. Drop original columns.
+
+## Combine Data Sets
+
+### Mutating Joins
+
+#### left_join()
+
+Join matching rows from b to a.
+
+#### right_join()
+
+Join matching rows from a to b.
+
+#### inner_join()
+
+Join data. Retain only rows in both sets.
+
+#### full_join()
+
+Join data. Retain all values, all rows.
+
+### Filtering Joins
+
+#### semi_join()
+
+All rows in **a** that have a match in **b**.
+
+#### anti_join()
+
+All rows in **a** that do not have a match in **b**.
+
+### Set Operations
+
+#### intersect()
+
+Rows that appear in both **y** and **z**.
+
+#### union()
+
+Rows that appear in either or  both **y** and **z**.
+
+#### setdiff()
+Rows that appear in  **y** but not **z**.
+
+### Binding
+
+#### bind_rows()
+
+Append **z** to **y** as new rows.
+
+#### bind_cols()
+
+Append z to y as new columns.
+Caution: matches rows by position.
+
+## Group Data
+
+### group_by(iris,Species)
+
+Group data into rows with the same value of Species. 
+
+### ungroup(iris)
+
+Remove grouping information from data frame. 
+
+### iris %>% group_by(Species) %>% summarise(.)
+
+Compute separate summary row for each group.
+
+### iris %>% group_by(Species) %>% mutate(.)
+
+Compute new variables by group.

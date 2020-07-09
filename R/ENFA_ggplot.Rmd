@@ -1,0 +1,288 @@
+---
+title: "ENFA et CENFA"
+author :
+- Aboubacar HEMA 
+
+date: "avril 19, 2020"
+output:
+  word_document:
+    reference_docx: Reference.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidyselect)
+#library(SDMSelect)
+library(dplyr)
+library(sf)
+library(raster)
+library(rasterVis)
+library(RStoolbox)
+library(maptools)
+library(rgdal)
+library(spdep)
+library(ggplot2)
+library(ggspatial)
+library(blockCV)
+library(randomForest)
+library(rJava)
+library(dismo)
+library(ggpubr)
+library(questionr)
+library(CENFA)
+
+
+#######"import species
+Recodificateur <- function(data,espece,varying){
+  for (lag_size in espece) {
+    data <- data %>% 
+      dplyr::mutate(!!sym(lag_size) := as.factor(ifelse(varying == lag_size,1,0)))
+  }
+  return(data)
+}
+######construire des bases des espèces choisies
+Base<-function(Species,coord,espece){
+  Species<-st_drop_geometry(Species)
+  data<-list()
+  for (i in 1:length(espece)) {
+    data[[espece[i]]]<-Species[,c(coord[1],coord[2],espece[i])] 
+    # %>% 
+    #   dplyr::select(coord[1],coord[2],espece[i])
+    
+  }
+  return(data)
+}
+filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+Species<-st_read(filename,quiet = T)
+
+espece=list()
+espece = c("Faidherbia albida","Balanites aegyptiaca","Anogeissus leiocarpus",
+           "Adansonia digitata","Acacia nilotica")
+Species <- Recodificateur(data = Species,espece = espece,varying = Species$Species)
+
+coord<-list()
+coord<-c("xcoord","ycoord") #les variables sur la longitude=xcoord et la latitude=ycoord
+Base<-Base(Species,coord,espece)
+
+lsoil<-list.files("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\",patt="\\.tif")
+lsoil<-sprintf("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\%s",lsoil)
+
+e<-extent(-16.542,-16.348,14.45,14.64)
+
+AETI<-raster(lsoil[1])
+AETI.crop<-crop(AETI,e)
+names(AETI.crop)<-"AETI"
+CLYPPT<-raster(lsoil[2])
+CLYPPT.crop<-crop(CLYPPT,e)
+names(CLYPPT.crop)<-"CLYPPT"
+ORCDRC<-raster(lsoil[3])
+ORCDRC.crop<-crop(ORCDRC,e)
+names(ORCDRC.crop)<-"ORCDRC"
+PHIHOX<-raster(lsoil[4])
+PHIHOX.crop<-crop(PHIHOX,e)
+names(PHIHOX.crop)<-"PHIHOX"
+SLTPPT<-raster(lsoil[5])
+SLTPPT.crop<-crop(SLTPPT,e)
+names(SLTPPT.crop)<-"SLTPPT"
+SNDPPT<-raster(lsoil[6])
+SNDPPT.crop<-crop(SNDPPT,e)
+names(SNDPPT.crop)<-"SNDPPT"
+NTO<-raster(lsoil[7])
+NTO.crop<-crop(NTO,e)
+names(NTO.crop)<-"NTO"
+P<-raster(lsoil[8])
+P.crop<-crop(P,e)
+names(P.crop)<-"P"
+NBWP<-raster(lsoil[9])
+NBWP.crop<-crop(NBWP,e)
+names(NBWP.crop)<-"NBWP"
+SINT<-raster(lsoil[10])
+SINT.crop<-crop(SINT,e)
+names(SINT.crop)<-"SINT"
+SOS<-raster(lsoil[11])
+SOS.crop<-crop(SOS,e)
+names(SOS.crop)<-"SOS"
+
+##################"
+AETI<-projectRaster(AETI.crop,P.crop)
+CLYPPT<-projectRaster(CLYPPT.crop,P.crop)
+#extent(CLYPPT)<-extent(P.crop)
+ORCDRC<-projectRaster(ORCDRC.crop,P.crop)
+#extent(ORCDRC)<-extent(P.crop)
+PHIHOX<-projectRaster(PHIHOX.crop,P.crop)
+fun <- function(x) { x / 10 }
+PHIHOX<-calc(PHIHOX,fun)
+names(PHIHOX)<-"PHIHOX"
+SLTPPT<-projectRaster(SLTPPT.crop,P.crop)
+NTO<-projectRaster(NTO.crop,P.crop)
+SNDPPT<-projectRaster(SNDPPT.crop,P.crop)
+NBWP<-projectRaster(NBWP.crop,P.crop)
+SINT<-projectRaster(SINT.crop,P.crop)
+SOS<-projectRaster(SOS.crop,P.crop)
+P<-P.crop
+
+SoilGrid.crop<-stack(AETI,SINT,SOS,NBWP,CLYPPT,ORCDRC,PHIHOX,SLTPPT,NTO,SNDPPT,P)
+
+###########
+l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+worldclim<-stack(l1)
+worldclim.crop <- crop(worldclim,e)
+worldclim.crop<-projectRaster(worldclim.crop,P)
+worldclim.crop<-stack(worldclim.crop)
+topofilename<-paste0("C:\\Users\\Hp\\OneDrive\\Memoire_ITS4\\shpzones\\variables topographiques","\\topo.shp")
+topo <- shapefile(topofilename,verbose=TRUE)
+
+Slo1 <- rasterize(topo, P, field="Slo1")
+names(Slo1)<-"Slo1"
+Len1 <- rasterize(topo, P, field="Len1")
+#plot(Len1)
+names(Len1)<-"Len1"
+#writeRaster(Len1, filename=file.path(tmp, "Len1.tif"), format="GTiff", overwrite=TRUE)
+######
+Sll <- rasterize(topo, P, field="Sll")
+#plot(Sll) # valeur identique
+names(Sll)<-"Sll"
+#writeRaster(Sll, filename=file.path(tmp, "Sll.tif"), format="GTiff", overwrite=TRUE)
+##### 
+Csl <- rasterize(topo, P, field="Csl")
+#plot(Csl)
+names(Csl)<-"Csl"
+#writeRaster(Csl, filename=file.path(tmp, "Csl.tif"), format="GTiff", overwrite=TRUE)
+####
+
+Wid1 <- rasterize(topo, P, field="Wid1")
+#plot(Wid1)
+names(Wid1)<-"Wid1"
+#writeRaster(Wid1, filename=file.path(tmp, "Wid1.tif"), format="GTiff", overwrite=TRUE)
+#############
+Dep1 <- rasterize(topo, P, field="Dep1")
+#plot(Dep1)
+names(Dep1)<-"Dep1"
+#writeRaster(Dep1, filename=file.path(tmp, "Dep1.tif"), format="GTiff", overwrite=TRUE)
+###########
+Elev <- rasterize(topo, P, field="Elev")
+#plot(Elev)
+names(Elev)<-"Elev"
+#writeRaster(Elev, filename=file.path(tmp, "Elev.tif"), format="GTiff", overwrite=TRUE)
+###########
+Vartopo<-stack(Slo1,Len1,Sll,Csl,Wid1,Dep1,Elev)
+Variables<-stack(SoilGrid.crop,worldclim.crop,Vartopo)
+
+#bio14=17,bio19=22,Sll=31
+#names(Variables)
+ENFA_var <- dropLayer(Variables, c(17, 22, 33))
+Base_Faidherbia_Z<-Base$`Faidherbia albida`
+names(Base_Faidherbia_Z)<-c("lon","lat","Faidherbia.albida")
+FaidherbiaPr<- Base_Faidherbia_Z %>%
+  filter(Faidherbia.albida ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(FaidherbiaPr) <-~lon+lat
+sp::proj4string(FaidherbiaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Balanites_Z<-Base$`Balanites aegyptiaca`
+names(Base_Balanites_Z)<-c("lon","lat","Balanites.aegyptiaca")
+BalanitesPr<- Base_Balanites_Z %>%
+  filter(Balanites.aegyptiaca ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(BalanitesPr) <-~lon+lat
+sp::proj4string(BalanitesPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Anogeissus_Z<-Base$`Anogeissus leiocarpus`
+names(Base_Anogeissus_Z)<-c("lon","lat","Anogeissus.leiocarpus")
+AnogeissusPr<- Base_Anogeissus_Z %>%
+  filter(Anogeissus.leiocarpus ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(AnogeissusPr) <-~lon+lat
+sp::proj4string(AnogeissusPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Adansonia_Z<-Base$`Adansonia digitata`
+names(Base_Adansonia_Z)<-c("lon","lat","Adansonia.digitata")
+AdansoniaPr<- Base_Adansonia_Z %>%
+  filter(Adansonia.digitata ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(AdansoniaPr) <-~lon+lat
+sp::proj4string(AdansoniaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+Base_Acacia_Z<-Base$`Acacia nilotica`
+names(Base_Acacia_Z)<-c("lon","lat","Acacia.nilotica")
+AcaciaPr<- Base_Acacia_Z %>%
+  filter(Acacia.nilotica ==1)
+#Transform data as SpatialPointDataFrame
+sp::coordinates(AcaciaPr) <-~lon+lat
+sp::proj4string(AcaciaPr) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+glc <- GLcenfa(x = ENFA_var)
+```
+
+##ENFA  Faidherbia albida
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Analyse factorielle de la niche ecologique (ENFA) de la distribution de Faidherbia albida"}
+var_expli<-list()
+var_explibio<-list()
+FaidherbiaPr@data$Faidherbia.albida<-as.numeric(FaidherbiaPr@data$Faidherbia.albida)
+mod.enfa <- CENFA::enfa(x = ENFA_var, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
+# var_expli[[espece[1]]]<-dropLayer(ENFA_var,c("bio2","bio3","bio6"))
+# var_explibio[[espece[1]]]<-subset(ENFA_var,str_subset(names(var_expli[[1]]),"bio"))
+CENFA::scatter(x = mod.enfa, y = glc,n=34,p=1)
+#names(var_explibio[[1]])
+# mod.cnfa <- CENFA::cnfa(x = var_expli$`Faidherbia albida`, s.dat = FaidherbiaPr, field = "Faidherbia.albida")
+# #mod.cnfa
+# s.map <- CENFA::sensitivity_map(mod.cnfa)
+# plot(s.map)
+# ggR_Predict(s.map)
+```
+
+##ENFA  Balanites
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche ecologique (ENFA) de la distribution de Balanites aegyptiaca"}
+BalanitesPr@data$Balanites.aegyptiaca<-as.numeric(BalanitesPr@data$Balanites.aegyptiaca)
+mod.enfaB <- CENFA::enfa(x = ENFA_var, s.dat = BalanitesPr, field = "Balanites.aegyptiaca")
+# var_expli[[espece[2]]]<-dropLayer(ENFA_var,c("bio2","bio3","bio5","bio6","bio7","bio12","bio16"))
+# var_explibio[[espece[2]]]<-subset(ENFA_var,str_subset(names(var_expli[[2]]),"bio"))
+CENFA::scatter(x = mod.enfaB, y = glc,n=34,p=1)
+# mod.cnfaB <- cnfa(x = var_expli$`Balanites aegyptiaca`, s.dat = BalanitesPr, field = "Balanites.aegyptiaca")
+```
+
+
+##ENFA Anogeissus
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche ecologique (ENFA) de la distribution de Anogeissus leiocarpus"}
+AnogeissusPr@data$Anogeissus.leiocarpus<-as.numeric(AnogeissusPr@data$Anogeissus.leiocarpus)
+mod.enfaAno <- CENFA::enfa(x = ENFA_var, s.dat = AnogeissusPr, field = "Anogeissus.leiocarpus")
+# var_expli[[espece[3]]]<-dropLayer(ENFA_var,c("bio2","bio3","bio5","bio6","bio7","bio12","bio16"))
+# var_explibio[[espece[3]]]<-subset(ENFA_var,str_subset(names(var_expli[[3]]),"bio"))
+CENFA::scatter(x = mod.enfaAno, y = glc,n=34,p=1)
+```
+
+
+##ENFA Adansonia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche ecologique (ENFA) de la distribution de Adansonia digitata"}
+AdansoniaPr@data$Adansonia.digitata<-as.numeric(AdansoniaPr@data$Adansonia.digitata)
+mod.enfaAdan <- CENFA::enfa(x = ENFA_var, s.dat = AdansoniaPr, field = "Adansonia.digitata")
+# var_expli[[espece[4]]]<-dropLayer(ENFA_var,c("bio1","bio2","bio3","bio5","bio6","bio7","bio9",
+#                                          "bio11","bio10","bio12","bio13","bio16","Csl","PHIHOX","SOS","SNPPT"))
+# var_explibio[[espece[4]]]<-subset(ENFA_var,str_subset(names(var_expli[[4]]),"bio"))
+CENFA::scatter(x = mod.enfaAdan, y = glc,n=34,p=1)
+# mod.cnfaAdan <- cnfa(x = var_expli$`Adansonia digitata`, s.dat = AdansoniaPr, field = "Adansonia.digitata")
+# #mod.cnfaAdan
+# s.mapAdan <- sensitivity_map(mod.cnfaAdan)
+# plot(s.mapAdan)
+# ggR_Predict(s.mapAdan)
+```
+
+##ENFA Acacia
+```{r echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Analyse factorielle de la niche ecologique (ENFA) de la distribution de Acacia nilotica"}
+AcaciaPr@data$Acacia.nilotica<-as.numeric(AcaciaPr@data$Acacia.nilotica)
+mod.enfaAca <- CENFA::enfa(x = ENFA_var, s.dat = AcaciaPr, field = "Acacia.nilotica")
+# var_expli[[espece[5]]]<-dropLayer(ENFA_var,c("bio2","bio3","bio5","bio7","bio10","bio12","bio13","bio15","bio16"))
+# var_explibio[[espece[5]]]<-subset(ENFA_var,str_subset(names(var_expli[[5]]),"bio"))
+CENFA::scatter(x = mod.enfaAca, y = glc,n=34,p=1)
+# mod.cnfaAca <- cnfa(x = var_expli$`Acacia nilotica`, s.dat = AcaciaPr, field = "Acacia.nilotica")
+# #mod.cnfaAca
+# s.mapAca <- sensitivity_map(mod.cnfaAca)
+# #plot(s.mapAca)
+# ggR_Predict(s.mapAca)
+```
+

@@ -1,0 +1,26 @@
+\begin{table}[H]
+	\centering
+	\caption{\textit{Variables explicatives des espèces étudiées}}
+	\begin{tabular}{|l|l|l|} 
+		\hline
+		Zone d'étude &	Espèces & Variables explicatives \\ 
+		\hline
+		\multirow{5}{*}{Niakar} 	
+		& Faidherbia albida &  bio5,CLYPPT,bio18,PHIHOX,Elev,SINT,bio7,Dep1,bio4,ORCDRC,bio13,Csl,bio9,bio16,bio15,bio15,NTO,bio1,SNDPPT,SOS,AETI,bio17,bio8,bio11,Len1,Wid1,NAWP,P,SLTPPT,Slo1,bio12,bio10\\
+		& Balanites aegyptiaca & bio18,bio15,AETI,bio13,NTO,CLYPPT,NBWP,bio4,bio9,Csl,P,Elev,PHIHOX,bio8,bio17,bio11,bio10,bio1,Wid1,Slo1,SOS,SNDPPT,SLTPPT,SINT,ORCDRC,Len1,Dep1  \\ 
+		& Anogeissus leiocarpus & bio13,SNDPPT,Dep1,AETI,SOS,bio8,bio4,NBWP,Len1,CLYPPT,Slo1,bio18,bio1,bio15,Wid1,SLTPPT,bio9,ORCDRC,SINT,bio17,NTO,Elev,bio10,PHIHOX,P,Csl,bio11  \\ 
+		& Adansonia digitata & AETI,SINT,NBWP,Elev,NTO,CLYPPT,Len1,bio4,SLTPPT,Slo1,P,bio8,Wid1,ORCDRC,bio18,bio17,Dep1  \\
+		& Acacia nilotica & PHIHOX,ORCDRC,bio6,bio4,Dep1,Slo1,Len1,Elev,AETI,NBWP,SINT,NTO,bio11,CLYPPT,Wid1,SOS,bio9,bio8,bio1,bio18,SNDPPT,SLTPPT,Csl,bio17,P  \\
+		
+		\hline
+		\multirow{4}{*}{Nioro} &
+		Cordyla pinnata & AETI,NTO,Csl,bio1,bio15,bio11,Slo1,bio4,SOS,bio12,Len1,bio6,SNDPPT,CLYPPT,bio8,bio18,NBWP,bio10,P,SINT,bio13,PHIHOX,SLTPPT,ORCDRC,Dep1,Elev,Wid1,bio16  \\
+		& Azadirachta indica & bio19,P,bio9,Len1,bio8,bio15,PHIHOX,bio12,Csl,SNDPPT,NBWP,bio11,bio18,SINT,Dep1,SLTPPT,Slo1,SOS,Elev,bio13,ORCDRC,NTO,AETI,Wid1   \\
+		& Prosopis africana & ORCDRC,NTO,P,CLYPPT,SINT,NBWP,bio9,Elev,bio1,bio11,AETI,Len1,bio19,bio8,Csl,SLTPPT,bio13,Wid1,SNDPPT,Dep,Slo1,SOS  \\
+		& Ficus capensis & bio1,bio10,NTO,P,SINT,Len1,Slo1,bio19,Elev,bio18,bio11,Dep1,ORCDRC,SNDPPT,Csl,SOS,AETI,bio8,bio4  \\
+		
+		\hline
+		
+	\end{tabular}
+	\caption*{\textbf{Source: }Projets SERENA et LYSA(2017-2019), Calcul de l'auteur}
+\end{table}

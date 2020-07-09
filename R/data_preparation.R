@@ -107,7 +107,7 @@ table(group_by_Species_df_1_2$Effectif)
     filter(Effectif >215)
   table(group_by_Species_df_plus_215$Effectif)
   #Graphiques en points: alternative au graphique en barres quand il y a beaucoup de catégories à représenter.
-  g1<-ggdotchart(group_by_Species_df_plus_215,
+  g1<-ggdotchart(group_by_Species_top_n,
                  x="Species",y="Effectif",color="Effectif",
                  sorting = "ascending",add="segments",
                  sort.by.groups=TRUE,ggtheme = theme_pubr())
