@@ -1,5 +1,5 @@
 ---
-title: "Nioro_2_espèces"
+title: "Nioro_2_esp?ces"
 author: "Aboubacar HEMA,ITS4"
 date: "27 juin 2020"
 output: word_document
@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-########Packages à installer
+########Packages ? installer
 # ipak <- function(pkg){
 #   new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 #   if (length(new.pkg)) 
@@ -280,7 +280,7 @@ Selectpredictors<-function(RasterStack,predictors){
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 chemin<-"C:\\Users\\Hp\\OneDrive\\cirad\\ParcFaidherbia\\Data\\BD_Arbres"
-#data<-"arbres_diohine_mai2018_par_Zone_OK_BON.shp" # base des arbres du parc à Prosopis africana
+#data<-"arbres_diohine_mai2018_par_Zone_OK_BON.shp" # base des arbres du parc ? Prosopis africana
 data<-"bd_arbres_nioro.shp"
 data<-paste0("\\",data)
 filename<-paste0(chemin,data)
@@ -2242,6 +2242,36 @@ p <- ggpaired(EvaluationC,
               short.panel.labs = FALSE)
 
 p + facet_grid(Espece ~Type + blocs) + theme_bw() + ylab("AUC") + xlab("")
+
+
+#################""
+library(tidyverse)
+library(ggpubr)
+Evaluation<-read.csv2("C:/Users/DELLDRAMOMO/OneDrive/cirad/EvaluationModeles") 
+
+Evaluation<-Evaluation[,2:ncol(Evaluation)]
+Evaluation$blocs<-plyr::revalue(Evaluation$blocs,c("Oui"="Avec blocs","Non"="Sans blocs"))
+EvaluationF<-Evaluation %>% 
+  dplyr::filter(Espece=="F. albida") %>% 
+  dplyr::filter(Model=="Oui")
+
+EvaluationF$blocs<-plyr::revalue(EvaluationF$blocs,c("Avec blocs"="B","Sans blocs"="NB"))
+EvaluationF$Espece<-plyr::revalue(EvaluationF$Espece,c("F. albida"="Faidherbia albida"))
+EvaluationF$Type<-plyr::revalue(EvaluationF$Type,c("bioclim"="Bioclim","mahal"="Mahal","MaxEnt"="Maxent","domain"="Domain"))
+
+p <- ggpaired(EvaluationF,
+              x = "blocs", 
+              y = "AUC",
+              color = "blocs",
+              palette = NULL, 
+              line.color = "blue",
+              line.size = 1,
+              #facet.by = "Espece",
+              short.panel.labs = FALSE) 
+
+p + facet_grid(Espece ~Type) + theme_bw() + ylab("AUC") + xlab("") + theme(axis.text=element_text(size=18,face="bold"),
+                                                                           axis.title=element_text(size=18,face="bold"),strip.text.x = element_text(size = 20),strip.text.y = element_text(size = 20,face="italic"))  
+
 ```
 
 

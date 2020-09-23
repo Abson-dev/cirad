@@ -26,11 +26,13 @@ library(CENFA)
 rm(list = ls()) #Effacement de toutes les données en mémoire
 graphics.off() #Effacement de tous les graphiques en mémoire
 # import raster data
-l1<-list.files("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
-l1<-sprintf("D:\\Stage_SDM\\SDM\\Data\\WorldClim\\wc2.0_30s_bio\\%s",l1)
+l1<-list.files("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\WorldClim\\wc2.0_30s_bio\\",patt="\\.tif")
+l1<-sprintf("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\WorldClim\\wc2.0_30s_bio\\%s",l1)
 worldclim<-stack(l1)
-bio1 <- raster(worldclim, layer=1)
-plot(bio1)
+plot(worldclim)
+#13,14,19
+bio <- raster(worldclim, layer=19)
+plot(bio)
 
 ##########
 ggR_P<-function(rasterLayer){
@@ -43,7 +45,7 @@ basePlot1 <- ggplot2::ggplot() + ggplot2::geom_raster(data = map_df,
 basePlot1<-basePlot1 + ggplot2::theme_bw() + ggplot2::labs(x = "Longitude", y = "Latitude") +
   ggtitle(label = names(rasterLayer)) + 
   theme(plot.title = element_text(hjust = 0.5, size = 10)) + 
-  ggplot2::scale_fill_gradientn(name = "Probabilité", colours = rev(terrain.colors(10)))
+  ggplot2::scale_fill_gradientn(name = "Probability \n of occurence", colours = rev(terrain.colors(10)))
 return(basePlot1)
 }
 ggR_P(bio1)
@@ -130,8 +132,10 @@ ggexport(bio13_19,filename ="bio13_19.png",width = 948, height = 480)
 rm(list = ls()) #Effacement de toutes les données en mémoire
 graphics.off() #Effacement de tous les graphiques en mémoire
 # import raster data
-lsoil<-list.files("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\",patt="\\.tif")
-lsoil<-sprintf("D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\%s",lsoil)
+lsoil<-list.files("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SoilGrids_250m\\",patt="\\.tif")
+lsoil<-sprintf("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SoilGrids_250m\\%s",lsoil)
+
+
 filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
 class(lsoil)
@@ -147,6 +151,7 @@ ggR_Soil<-function(RasterLayer){
 
 ##########
 CLYPPT<-raster(lsoil[1])
+plot(CLYPPT)
 CLYPPT.crop<-crop(CLYPPT,extent(Species))
 names(CLYPPT.crop)<-"CLYPPT"
 CLYPPT<-ggR_Soil(CLYPPT.crop)
@@ -205,8 +210,8 @@ ggarrange(CLYPPT,ORCDRC, PHIHOX,SLTPPT,SNDPPT,NTO,P)
 
 ############################Phénologie
 # import raster data
-lpheno<-list.files("D:\\Stage_SDM\\SDM\\Data\\Phenologie\\",patt="\\.tif")
-lpheno<-sprintf("D:\\Stage_SDM\\SDM\\Data\\Phenologie\\%s",lpheno)
+lpheno<-list.files("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\Phenologie\\",patt="\\.tif")
+lpheno<-sprintf("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\Phenologie\\%s",lpheno)
 lpheno
 filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
@@ -224,24 +229,24 @@ ggexport(pheno,filename ="pheno.png",width = 948, height = 480)
 ##################???wapor
 # import raster data
 #AETI
-laeti<-list.files("D:\\Stage_SDM\\SDM\\Data\\AETI\\",patt="\\.tif")
-laeti<-sprintf("D:\\Stage_SDM\\SDM\\Data\\AETI\\%s",laeti)
+laeti<-list.files("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\AETI\\",patt="\\.tif")
+laeti<-sprintf("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\AETI\\%s",laeti)
 AETI_2009_2019<-stack(laeti)
 AETI_2009_2019_mean<-calc(AETI_2009_2019,mean)
-tmpdir<-"D:\\Stage_SDM\\SDM\\Data\\AETI\\"
+tmpdir<-"C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\AETI\\"
 writeRaster(AETI_2009_2019_mean, filename=file.path(tmpdir, "AETI_2009_2019_mean.tif"), format="GTiff", overwrite=TRUE)
-tmpdir<-"D:\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\"
+tmpdir<-"C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\SoilGrids_250m\\"
 writeRaster(AETI_2009_2019_mean, filename=file.path(tmpdir, "AETI_2009_2019_mean.tif"), format="GTiff", overwrite=TRUE)
 AETI_2009_2019.crop<-crop(AETI_2009_2019_mean,extent(Species))
 names(AETI_2009_2019.crop)<-"AETI"
 AETI<-ggR_Soil(AETI_2009_2019.crop)
 #NETBIOMASS
-lbiomas<-list.files("D:\\Stage_SDM\\SDM\\Data\\nET BIOMAS\\",patt="\\.tif")
-lbiomas<-sprintf("D:\\Stage_SDM\\SDM\\Data\\nET BIOMAS\\%s",lbiomas)
+lbiomas<-list.files("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\nET BIOMAS\\",patt="\\.tif")
+lbiomas<-sprintf("C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\nET BIOMAS\\%s",lbiomas)
 #NETBIOMAS_2009_2019<-stack(lbiomas)
 #plot(NETBIOMAS_2009_2019)
 #NETBIOMAS_MOY<-calc(NETBIOMAS_2009_2019,mean)
-#tmpdir<-"D:\\Stage_SDM\\SDM\\Data\\nET BIOMAS\\"
+#tmpdir<-"C:\\Users\\DELLDRAMOMO\\Desktop\\Stage_SDM\\SDM\\Data\\nET BIOMAS\\"
 #writeRaster(NETBIOMAS_MOY, filename=file.path(tmpdir, "L1_NBWP_2009_2019_mean.tif"), format="GTiff", overwrite=TRUE)
 NETBIOMAS_MOY<-raster(lbiomas[12])
 NBWP.crop<-crop(NETBIOMAS_MOY,extent(Species))
@@ -339,8 +344,8 @@ PASpecies2<-function( rasterLayer1,rasterLayer2){
 }
 
 
-lsoil<-list.files("C:\\Users\\Hp\\OneDrive\\cirad\\Sorties\\",patt="\\.tif")
-lsoil<-sprintf("C:\\Users\\Hp\\OneDrive\\cirad\\Sorties\\%s",lsoil)
+lsoil<-list.files("C:\\Users\\DELLDRAMOMO\\OneDrive\\cirad\\Sorties\\",patt="\\.tif")
+lsoil<-sprintf("C:\\Users\\DELLDRAMOMO\\OneDrive\\cirad\\Sorties\\%s",lsoil)
 # espece=c("Cordyla pinnata","Azadirachta indica")
 # c("Faidherbia albida"="F. albida","Balanites aegyptiaca"="B. aegyptiaca",
 #   "Anogeissus leiocarpus"="A. leiocarpus","Adansonia digitata"="A. digitata","Acacia nilotica"="A. nilotica"))

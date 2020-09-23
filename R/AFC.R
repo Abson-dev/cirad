@@ -3,7 +3,7 @@ library(factoextra)
 library(sf)
 
 ###########stat desc
-filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+filename<-paste0("C:\\Users\\DELLDRAMOMO\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Spec<-st_read(filename,quiet = T)             
 Species_df<-st_drop_geometry(Spec) 
 library(funModeling)
@@ -317,7 +317,7 @@ fviz_ca_biplot (res.ca,title  = "", map = "colgreen", arrow = c (TRUE, FALSE),
 
 ########################Nioro
 
-filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\ParcFaidherbia\\Data\\BD_Arbres","\\bd_arbres_nioro.shp")
+filename<-paste0("C:\\Users\\DELLDRAMOMO\\OneDrive\\cirad\\ParcFaidherbia\\Data\\BD_Arbres","\\bd_arbres_nioro.shp")
 Spec<-st_read(filename,quiet = T) 
 library(raster)
 extent(Spec)
@@ -325,12 +325,14 @@ Species_df<-st_drop_geometry(Spec)
 library(funModeling)
 library(tidyverse)
 df_stat<-df_status(Species_df)
-group_by_Species<-Species_df %>% 
+group_by_Species2<-Species_df %>% 
   filter(! is.na(Espece))%>%
    group_by(Espece) %>% 
   summarise(Effectif=n()) %>% 
   mutate(Pourcentage=round(Effectif*100/6611,2)) %>%
   arrange(desc(Pourcentage))
+write.csv2(group_by_Species2,"Base_Nioro.csv")
+write.csv2(group_by_Species,"Base_Niakhar.csv")
 ############"
 df<-group_by_Species %>% 
   select(Espece,Pourcentage) %>% 

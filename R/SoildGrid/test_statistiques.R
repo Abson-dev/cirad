@@ -27,7 +27,7 @@ library(questionr)
 rm(list = ls()) #Effacement de toutes les données en mémoire
 graphics.off() #Effacement de tous les graphiques en mémoire
 # import presence-absence species data
-filename<-paste0("C:\\Users\\Hp\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
+filename<-paste0("C:\\Users\\DELLDRAMOMO\\OneDrive\\cirad\\Data\\BD_Arbre","\\arbres_diohine_mai2018_par_Zone_OK_BON.shp")
 Species<-st_read(filename,quiet = T)
 #
 Base_Espece<-Species
@@ -232,3 +232,4 @@ row.names(AcaciaZone)<-"Acacia"
 Gtest<-rbind(FaidherbiaZone,BalanitesZone,AnogeissusZone,AdansoniaZone,AcaciaZone)
 xtable(Gtest)
 ################# Test Exact Fisher
+
